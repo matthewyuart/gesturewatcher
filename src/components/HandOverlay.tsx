@@ -39,7 +39,7 @@ export function HandOverlay() {
     for (const hand of frame.hands) {
       // Skeleton (camera mode only — mouse mode has no landmarks).
       if (hand.landmarks.length === 21) {
-        ctx.strokeStyle = 'rgba(94, 234, 212, 0.35)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (const [a, b] of CONNECTIONS) {
@@ -47,7 +47,7 @@ export function HandOverlay() {
           ctx.lineTo(hand.landmarks[b].x, hand.landmarks[b].y);
         }
         ctx.stroke();
-        ctx.fillStyle = 'rgba(94, 234, 212, 0.5)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         for (const p of hand.landmarks) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
@@ -59,15 +59,18 @@ export function HandOverlay() {
       const { x, y } = hand.cursor;
       const radius = 22 - hand.pinchStrength * 10;
       ctx.lineWidth = 3;
-      ctx.strokeStyle = hand.pinch ? '#f0abfc' : '#5eead4';
+      ctx.strokeStyle = hand.pinch ? '#ffb84d' : 'rgba(255, 255, 255, 0.95)';
+      ctx.shadowColor = hand.pinch ? 'rgba(255, 184, 77, 0.9)' : 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = hand.pinch ? 14 : 6;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.shadowBlur = 0;
       if (hand.pinch) {
-        ctx.fillStyle = 'rgba(240, 171, 252, 0.4)';
+        ctx.fillStyle = 'rgba(255, 184, 77, 0.35)';
         ctx.fill();
       }
-      ctx.fillStyle = hand.pinch ? '#f0abfc' : '#5eead4';
+      ctx.fillStyle = hand.pinch ? '#ffb84d' : '#ffffff';
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();

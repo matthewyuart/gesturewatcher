@@ -1,28 +1,35 @@
-# 🖐️ GestureWatcher
+# 🎛️ Programma GW-1 — gesture synthesizer
 
-**Build things visually with your hands.** GestureWatcher turns your webcam into an input device: it tracks your hands in real time (MediaPipe Hand Landmarker, fully in-browser — no video ever leaves your machine) and turns pinches, points, and palms into a cursor you can build with.
+**A synthesizer you conduct with your hands.** Your webcam becomes the controller: MediaPipe tracks both hands in-browser (no video ever leaves your machine) and a liquid-glass instrument panel floats over your live feed.
 
-## Modes
+**Play it:** https://gesturewatcher.vercel.app
 
-| Mode | What it does |
+## How to play
+
+| Gesture | Effect |
 | --- | --- |
-| **Layout** | Air-drag wireframe UI blocks (navbar, hero, cards…) from a shelf onto a canvas to sketch a page layout |
-| **Nodes** | A flow/system-diagram editor — pinch-drag nodes, pinch a port and release on another node to wire them up |
-| **Jarvis** | An Iron-Man style HUD — hover to target, pinch to press toggles and mission buttons, drag the radar around |
+| **Right hand height** | picks the note — quantized to your key + scale across 2 octaves (pitch ladder on screen) |
+| **Right hand pinch** | note on; slide up/down to glide between scale degrees |
+| **Drift sideways while pinched** | pitch bend (±2 semitones, 1 st per 150 px) |
+| **Left hand height** | live filter sweep — no pinch needed |
+| **Left hand pinch** | sustained chord pad — diatonic triad + your enabled extensions |
+| **Pinch a knob + drag up/down** | turn it |
+| **Pinch buttons** | select key / scale / octave / waveform, toggle 6th·7th·9th·sus4 |
 
-## Controls
+Press **POWER** first (browsers require a click to unlock audio). No camera? It falls back to mouse mode (click = pinch), or force it with `?mouse=1`.
 
-- **Move** — raise a hand; a ring cursor follows your thumb + index fingertips (up to two hands)
-- **Pinch** (thumb + index together) — grab / click / drag
-- **Release** — drop
-- **No camera?** It falls back to mouse simulation (click = pinch), also available via `?mouse=1`
+## The instrument
+
+- **SYNTH panel** — waveform selector (saw/square/tri/sine), FILTER · RES · ATTACK · RELEASE · ECHO · VOLUME knobs (hardware-style, black caps, white indicator lines)
+- **KEY panel** — 12-key selector, MAJOR/MINOR/DORIAN/PENTA scales, octave, chord-extension LED toggles
+- **Oscilloscope** — live waveform from the analyser in the top strip, plus current-note readout
+- **Audio graph** — dual detuned oscillators (mono lead, envelope-gated) + polyphonic chord voices → shared lowpass → feedback delay → limiter → out
+
+Aesthetic borrowed from DIY hardware synths ([Critter & Guitari-style boards](https://github.com/Atarity/diy-synths), Programma 900): cream frosted-glass panels, ink silkscreen labels, math doodles, LED dots — rendered as translucent liquid glass over your camera.
 
 ## Stack
 
-- [Vite](https://vite.dev) + React 19 + TypeScript
-- [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) `HandLandmarker` (GPU delegate, 2 hands, video mode)
-- One-Euro filtering for smooth low-latency cursors, hysteresis on pinch detection
-- Zero backend — everything runs client-side
+Vite + React 19 + TypeScript · `@mediapipe/tasks-vision` HandLandmarker (2 hands, GPU, video mode) · Web Audio API · One-Euro filtered cursors, pinch hysteresis · zero backend.
 
 ## Develop
 
@@ -31,7 +38,7 @@ npm install
 npm run dev
 ```
 
-The `predev`/`prebuild` script copies MediaPipe's wasm bundle from `node_modules` into `public/mediapipe/wasm` (gitignored); the hand-landmark model is fetched at runtime from Google's model CDN.
+`predev`/`prebuild` copies MediaPipe's wasm from `node_modules` into `public/mediapipe/wasm` (gitignored); the hand model loads at runtime from Google's model CDN.
 
 ## Privacy
 
@@ -39,4 +46,4 @@ Camera frames are processed locally by wasm in your browser. Nothing is uploaded
 
 ---
 
-Built autonomously by [Claude Code](https://claude.com/claude-code) — gesture engine + three parallel subagents, one per mode.
+Built autonomously by [Claude Code](https://claude.com/claude-code).
