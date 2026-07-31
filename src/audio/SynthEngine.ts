@@ -11,8 +11,8 @@ export interface SynthParams {
 
 export interface SynthDebugState {
   running: boolean;
-  gate: boolean;
-  freq: number;
+  gates: boolean[];
+  freqs: number[];
   chordGate: boolean;
   chordSize: number;
   rms: number;
@@ -32,10 +32,20 @@ interface ChordVoice {
   gain: GainNode;
 }
 
+interface LeadVoice {
+  osc1: OscillatorNode;
+  osc2: OscillatorNode;
+  gain: GainNode;
+  gate: boolean;
+  freq: number;
+}
+
+export const LEAD_VOICES = 2;
+
 /**
- * Monophonic lead (two detuned oscillators, always running, gated by an
- * envelope gain) + a polyphonic chord pad, through a shared lowpass filter
- * and a feedback delay, into master -> analyser -> destination.
+ * Two independent lead voices (each two detuned oscillators, always running,
+ * gated by an envelope gain) + a polyphonic chord pad, through a shared
+ * lowpass filter and a feedback delay, into master -> analyser -> destination.
  */
 export class SynthEngine {
   private ctx: AudioContext | null = null;
@@ -44,16 +54,12 @@ export class SynthEngine {
   private analyser!: AnalyserNode;
   private delayWet!: GainNode;
 
-  private leadOsc1!: OscillatorNode;
-  private leadOsc2!: OscillatorNode;
-  private leadGain!: GainNode;
+  private leads: LeadVoice[] = [];
 
   private chordVoices: ChordVoice[] = [];
 
   private waveKind: WaveKind = 'sawtooth';
-  private gateOn = false;
   private chordOnFlag = false;
-  private currentFreq = 220;
   private scopeBuf: Float32Array | null = null;
 
   params: SynthParams = {
@@ -101,20 +107,24 @@ export class SynthEngine {
 
     this.master.connect(limiter).connect(this.analyser).connect(ctx.destination);
 
-    // Lead voice — oscillators run forever, envelope gates the gain.
-    this.leadGain = ctx.createGain();
-    this.leadGain.gain.value = 0;
-    this.leadOsc1 = ctx.createOscillator();
-    this.leadOsc2 = ctx.createOscillator();
-    this.leadOsc2.detune.value = 9;
-    this.leadOsc1.connect(this.leadGain);
-    this.leadOsc2.connect(this.leadGain);
-    this.leadGain.connect(this.filter);
+    // Lead voices — oscillators run forever, envelope gates each gain.
+    this.leads = Array.from({ length: LEAD_VOICES }, (_, i) => {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc2.detune.value = i === 0 ? 9 : -9;
+      const freq = 220 * (i + 1);
+      osc1.frequency.value = freq;
+      osc2.frequency.value = freq;
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.filter);
+      osc1.start();
+      osc2.start();
+      return { osc1, osc2, gain, gate: false, freq };
+    });
     this.setWave(this.waveKind);
-    this.leadOsc1.frequency.value = this.currentFreq;
-    this.leadOsc2.frequency.value = this.currentFreq;
-    this.leadOsc1.start();
-    this.leadOsc2.start();
 
     this.scopeBuf = new Float32Array(this.analyser.fftSize);
     this.applyParams();
@@ -124,8 +134,10 @@ export class SynthEngine {
   setWave(wave: WaveKind): void {
     this.waveKind = wave;
     if (!this.ctx) return;
-    this.leadOsc1.type = wave;
-    this.leadOsc2.type = wave;
+    for (const v of this.leads) {
+      v.osc1.type = wave;
+      v.osc2.type = wave;
+    }
   }
 
   getWave(): WaveKind {
@@ -165,32 +177,38 @@ export class SynthEngine {
     return 0.06 + this.params.release * 2.4;
   }
 
-  noteOn(freq: number): void {
+  noteOn(voice: number, freq: number): void {
     if (!this.ctx) return;
-    this.gateOn = true;
-    this.currentFreq = freq;
+    const v = this.leads[voice];
+    if (!v) return;
+    v.gate = true;
+    v.freq = freq;
     const t = this.ctx.currentTime;
-    this.leadOsc1.frequency.setTargetAtTime(freq, t, 0.01);
-    this.leadOsc2.frequency.setTargetAtTime(freq, t, 0.01);
-    this.leadGain.gain.cancelScheduledValues(t);
-    this.leadGain.gain.setTargetAtTime(0.32, t, this.attackSec() / 3);
+    v.osc1.frequency.setTargetAtTime(freq, t, 0.01);
+    v.osc2.frequency.setTargetAtTime(freq, t, 0.01);
+    v.gain.gain.cancelScheduledValues(t);
+    v.gain.gain.setTargetAtTime(0.26, t, this.attackSec() / 3);
   }
 
   /** Glide the sounding pitch (quantized target or bend) while gated. */
-  setFreq(freq: number, glide = 0.05): void {
+  setFreq(voice: number, freq: number, glide = 0.05): void {
     if (!this.ctx) return;
-    this.currentFreq = freq;
+    const v = this.leads[voice];
+    if (!v) return;
+    v.freq = freq;
     const t = this.ctx.currentTime;
-    this.leadOsc1.frequency.setTargetAtTime(freq, t, glide);
-    this.leadOsc2.frequency.setTargetAtTime(freq, t, glide);
+    v.osc1.frequency.setTargetAtTime(freq, t, glide);
+    v.osc2.frequency.setTargetAtTime(freq, t, glide);
   }
 
-  noteOff(): void {
+  noteOff(voice: number): void {
     if (!this.ctx) return;
-    this.gateOn = false;
+    const v = this.leads[voice];
+    if (!v) return;
+    v.gate = false;
     const t = this.ctx.currentTime;
-    this.leadGain.gain.cancelScheduledValues(t);
-    this.leadGain.gain.setTargetAtTime(0, t, this.releaseSec() / 3);
+    v.gain.gain.cancelScheduledValues(t);
+    v.gain.gain.setTargetAtTime(0, t, this.releaseSec() / 3);
   }
 
   chordOn(freqs: number[]): void {
@@ -244,8 +262,8 @@ export class SynthEngine {
     }
     return {
       running: this.isRunning,
-      gate: this.gateOn,
-      freq: this.currentFreq,
+      gates: this.leads.map((v) => v.gate),
+      freqs: this.leads.map((v) => v.freq),
       chordGate: this.chordOnFlag,
       chordSize: this.chordVoices.length,
       rms,

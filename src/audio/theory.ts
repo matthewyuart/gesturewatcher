@@ -2,12 +2,14 @@ export const NOTE_NAMES = [
   'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
 ] as const;
 
-export type ScaleId = 'major' | 'minor' | 'dorian' | 'penta';
+export type ScaleId = 'major' | 'minor' | 'dorian' | 'lydian' | 'mixo' | 'penta';
 
 export const SCALES: Record<ScaleId, { label: string; steps: number[] }> = {
   major: { label: 'MAJOR', steps: [0, 2, 4, 5, 7, 9, 11] },
   minor: { label: 'MINOR', steps: [0, 2, 3, 5, 7, 8, 10] },
   dorian: { label: 'DORIAN', steps: [0, 2, 3, 5, 7, 9, 10] },
+  lydian: { label: 'LYDIAN', steps: [0, 2, 4, 6, 7, 9, 11] },
+  mixo: { label: 'MIXO', steps: [0, 2, 4, 5, 7, 9, 10] },
   penta: { label: 'PENTA', steps: [0, 3, 5, 7, 10] },
 };
 

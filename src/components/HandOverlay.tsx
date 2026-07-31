@@ -55,24 +55,21 @@ export function HandOverlay() {
         }
       }
 
-      // Cursor ring: shrinks and fills as the pinch closes.
+      // Cursor ring: shrinks as the pinch closes; solid white when pinched.
       const { x, y } = hand.cursor;
       const radius = 22 - hand.pinchStrength * 10;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = hand.pinch ? '#ffb84d' : 'rgba(255, 255, 255, 0.95)';
-      ctx.shadowColor = hand.pinch ? 'rgba(255, 184, 77, 0.9)' : 'rgba(0, 0, 0, 0.6)';
-      ctx.shadowBlur = hand.pinch ? 14 : 6;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.shadowBlur = 0;
       if (hand.pinch) {
-        ctx.fillStyle = 'rgba(255, 184, 77, 0.35)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.fill();
       }
-      ctx.fillStyle = hand.pinch ? '#ffb84d' : '#ffffff';
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
       ctx.fill();
     }
   }, [frame]);

@@ -16,6 +16,12 @@ export interface Hand {
   pinchStrength: number;
   /** Coarse hand pose. 'pinch' wins over other poses. */
   pose: HandPose;
+  /**
+   * Hand roll in radians: angle of the wrist→middle-knuckle axis in screen
+   * space. 0 = fingers pointing up, positive = rotated clockwise on screen.
+   * Always 0 in mouse mode (no landmarks).
+   */
+  roll: number;
   /** All 21 landmarks in viewport CSS pixels (mirrored), for skeleton drawing. */
   landmarks: Point[];
 }

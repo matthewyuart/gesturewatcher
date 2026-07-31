@@ -111,6 +111,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
           pinch,
           pinchStrength: pinch ? 1 : 0,
           pose: pinch ? 'pinch' : 'point',
+          roll: 0,
           landmarks: [],
         },
       ];
@@ -143,13 +144,20 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             const cursor = filter.filter(rawX, rawY, t);
 
             const label = result.handedness[i]?.[0]?.categoryName;
+            const screenLm = lm.map((p) => ({ x: (1 - p.x) * vw, y: p.y * vh }));
+            // Roll: wrist (0) -> middle MCP (9) axis; 0 = up, +cw on screen.
+            const roll = Math.atan2(
+              screenLm[9].x - screenLm[0].x,
+              -(screenLm[9].y - screenLm[0].y),
+            );
             return {
               handedness: label === 'Left' ? 'Left' : 'Right',
               cursor,
               pinch: cls.pinch,
               pinchStrength: cls.pinchStrength,
               pose: cls.pose,
-              landmarks: lm.map((p) => ({ x: (1 - p.x) * vw, y: p.y * vh })),
+              roll,
+              landmarks: screenLm,
             } satisfies Hand;
           });
           // Drop filters for hands that disappeared.

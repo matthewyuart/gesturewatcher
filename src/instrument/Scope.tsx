@@ -26,7 +26,7 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       ctx.clearRect(0, 0, W, H);
 
       // Graticule
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, H / 2);
@@ -38,10 +38,8 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       ctx.stroke();
 
       const ok = engine.readWaveform(buf);
-      ctx.strokeStyle = '#ffcf7d';
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = 'rgba(255, 207, 125, 0.8)';
-      ctx.shadowBlur = 5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
       const n = 512;
       for (let i = 0; i < n; i++) {
@@ -52,7 +50,6 @@ export function Scope({ engine }: { engine: SynthEngine }) {
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
-      ctx.shadowBlur = 0;
 
       raf = requestAnimationFrame(draw);
       timer = window.setTimeout(draw, 150);

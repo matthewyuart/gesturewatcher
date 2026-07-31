@@ -1,9 +1,5 @@
 :root {
-  --bg: #0a0c10;
-  --ink: #26231d;
-  --cream: #f4f1e9;
-  --led-amber: #ffb84d;
-  --led-white: #f2f6ff;
+  --bg: #000;
 
   --sans: 'Avenir Next', system-ui, 'Segoe UI', Roboto, sans-serif;
   --serif: Georgia, 'Times New Roman', serif;
@@ -56,24 +52,18 @@ button {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  filter: saturate(1.05) contrast(1.02);
 }
 
 .video-backdrop-fallback {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 90% 70% at 65% 20%, rgba(90, 110, 160, 0.35), transparent),
-    radial-gradient(ellipse 70% 60% at 20% 90%, rgba(160, 120, 90, 0.25), transparent),
-    linear-gradient(180deg, #171c26, #0a0c10);
+  background: #000;
 }
 
 .video-backdrop-tint {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 120% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55)),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 30%, transparent 70%, rgba(0, 0, 0, 0.3));
+  background: rgba(0, 0, 0, 0.28);
   pointer-events: none;
 }
 

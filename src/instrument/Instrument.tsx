@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
 import { useHandEvents } from '../gesture/useHandEvents';
-import type { Hand, Point } from '../gesture/types';
+import type { Point } from '../gesture/types';
 import { SynthEngine, type SynthParams, type WaveKind } from '../audio/SynthEngine';
 import {
   chordMidis,
@@ -14,12 +14,13 @@ import {
   type ScaleId,
 } from '../audio/theory';
 import { Knob } from './Knob';
+import { Slider } from './Slider';
 import { Scope } from './Scope';
 import './Instrument.css';
 
 type Claim =
-  | { type: 'knob'; param: keyof SynthParams; startY: number; startVal: number }
-  | { type: 'melody'; startX: number }
+  | { type: 'knob'; param: keyof SynthParams; startY: number; startVal: number; startRoll: number; twist: boolean }
+  | { type: 'slider'; which: number; centerX: number }
   | { type: 'chord' }
   | { type: 'pressed' };
 
@@ -39,13 +40,20 @@ const KNOB_ORDER: Array<{ param: keyof SynthParams; label: string }> = [
   { param: 'volume', label: 'VOLUME' },
 ];
 
-const BEND_RANGE = 2; // semitones at full horizontal deflection
+const BEND_RANGE = 2; // semitones at full sideways pull
 const BEND_PX = 150;
+const TWIST_FULL = (Math.PI * 3) / 4; // 135° of wrist roll = full knob range
 
 function inRect(el: Element | null, p: Point): boolean {
   if (!el) return false;
   const r = el.getBoundingClientRect();
   return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
+}
+
+function normAngle(a: number): number {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
 }
 
 export default function Instrument() {
@@ -66,19 +74,27 @@ export default function Instrument() {
     ninth: false,
     sus4: false,
   });
-  const [lastNote, setLastNote] = useState<string>('—');
-  const [melodyDegree, setMelodyDegree] = useState<number | null>(null);
   const [chordLit, setChordLit] = useState(false);
+
+  const scaleLen = SCALES[scaleId].steps.length;
+  const degreeCount = scaleLen * 2 + 1;
+
+  // Per-voice slider state: handle degree, sounding flag.
+  const [voiceDegrees, setVoiceDegrees] = useState<number[]>([scaleLen, scaleLen + 2]);
+  const [voiceLive, setVoiceLive] = useState<boolean[]>([false, false]);
 
   const claimsRef = useRef(new Map<number, Claim>());
   const controlsRef = useRef(new Map<string, HTMLElement>());
   const panelsRef = useRef(new Map<string, HTMLElement>());
-  const melodyStateRef = useRef({ degree: 0, midi: 60 });
 
-  // Keep latest musical settings visible to event handlers without re-subscribing.
   const settings = { keyIndex, scaleId, octave, ext };
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // Clamp slider handles when the scale (degree count) changes.
+  useEffect(() => {
+    setVoiceDegrees((prev) => prev.map((d) => Math.min(d, degreeCount - 1)));
+  }, [degreeCount]);
 
   const registerControl = useCallback(
     (id: string) => (el: HTMLElement | null) => {
@@ -95,24 +111,13 @@ export default function Instrument() {
     [],
   );
 
-  const scaleLen = SCALES[scaleId].steps.length;
-  const degreeCount = scaleLen * 2 + 1;
-
-  const yToDegree = useCallback(
-    (y: number): number => {
-      const yn = Math.min(1, Math.max(0, (y / window.innerHeight - 0.1) / 0.78));
-      return Math.round((1 - yn) * (degreeCount - 1));
-    },
-    [degreeCount],
-  );
-
   const powerOn = useCallback(() => {
     void engine.start().then(() => {
       setAudioOn(engine.isRunning);
     }).catch(() => setAudioOn(false));
   }, [engine]);
 
-  // Debug hook for headless verification.
+  // Debug hooks for headless verification.
   useEffect(() => {
     const w = window as unknown as Record<string, unknown>;
     w.__synth = () => engine.getDebugState();
@@ -127,16 +132,6 @@ export default function Instrument() {
       );
   }, [engine, audioOn]);
 
-  // Hand roles: 'Right' hand plays melody, 'Left' sweeps filter / plays chords.
-  const roleOf = useCallback(
-    (hands: Hand[], i: number): 'melody' | 'expression' => {
-      const rightIdx = hands.findIndex((h) => h.handedness === 'Right');
-      const melodyIdx = rightIdx >= 0 ? rightIdx : 0;
-      return i === melodyIdx ? 'melody' : 'expression';
-    },
-    [],
-  );
-
   const overAnyPanel = useCallback((p: Point): boolean => {
     for (const el of panelsRef.current.values()) if (inRect(el, p)) return true;
     return false;
@@ -147,10 +142,44 @@ export default function Instrument() {
     return null;
   }, []);
 
+  const sliderDegree = useCallback(
+    (which: number, y: number): number => {
+      const el = controlsRef.current.get(`slider:${which}`);
+      if (!el) return 0;
+      const r = el.getBoundingClientRect();
+      const yn = Math.min(1, Math.max(0, (y - r.top) / r.height));
+      return Math.round((1 - yn) * (degreeCount - 1));
+    },
+    [degreeCount],
+  );
+
+  const startSliderVoice = useCallback(
+    (which: number, handIndex: number, at: Point) => {
+      if (!engine.isRunning) return;
+      const s = settingsRef.current;
+      const el = controlsRef.current.get(`slider:${which}`);
+      const r = el?.getBoundingClientRect();
+      const degree = sliderDegree(which, at.y);
+      const midi = degreeToMidi(s.keyIndex, s.scaleId, degree, s.octave);
+      engine.noteOn(which, midiToFreq(midi));
+      setVoiceDegrees((prev) => prev.map((d, i) => (i === which ? degree : d)));
+      setVoiceLive((prev) => prev.map((v, i) => (i === which ? true : v)));
+      claimsRef.current.set(handIndex, {
+        type: 'slider',
+        which,
+        centerX: r ? r.left + r.width / 2 : at.x,
+      });
+    },
+    [engine, sliderDegree],
+  );
+
   const applyControl = useCallback(
-    (id: string, handIndex: number, at: Point) => {
+    (id: string, handIndex: number, at: Point, roll: number, hasLandmarks: boolean) => {
       if (id === 'power') {
         powerOn();
+      } else if (id.startsWith('slider:')) {
+        startSliderVoice(Number(id.slice(7)), handIndex, at);
+        return;
       } else if (id.startsWith('knob:')) {
         const param = id.slice(5) as keyof SynthParams;
         claimsRef.current.set(handIndex, {
@@ -158,6 +187,8 @@ export default function Instrument() {
           param,
           startY: at.y,
           startVal: engine.params[param],
+          startRoll: roll,
+          twist: hasLandmarks,
         });
         return;
       } else if (id.startsWith('wave:')) {
@@ -180,62 +211,57 @@ export default function Instrument() {
       }
       claimsRef.current.set(handIndex, { type: 'pressed' });
     },
-    [engine, powerOn, setSource, source],
+    [engine, powerOn, setSource, source, startSliderVoice],
   );
 
   useHandEvents({
-    onPinchStart: (i, at) => {
+    onPinchStart: (i, at, hand) => {
       const control = hitControl(at);
       if (control) {
-        applyControl(control, i, at);
+        applyControl(control, i, at, hand.roll, hand.landmarks.length === 21);
         return;
       }
       if (overAnyPanel(at)) {
         claimsRef.current.set(i, { type: 'pressed' });
         return;
       }
+      // Open air: chord pad (any hand).
       if (!engine.isRunning) return;
       const s = settingsRef.current;
-      if (roleOf(frame.hands, i) === 'melody') {
-        const degree = yToDegree(at.y);
-        const midi = degreeToMidi(s.keyIndex, s.scaleId, degree, s.octave);
-        melodyStateRef.current = { degree, midi };
-        engine.noteOn(midiToFreq(midi));
-        setLastNote(midiName(midi));
-        setMelodyDegree(degree);
-        claimsRef.current.set(i, { type: 'melody', startX: at.x });
-      } else {
-        const midis = chordMidis(s.keyIndex, s.scaleId, s.ext, s.octave - 1);
-        engine.chordOn(midis.map(midiToFreq));
-        setChordLit(true);
-        claimsRef.current.set(i, { type: 'chord' });
-      }
+      const midis = chordMidis(s.keyIndex, s.scaleId, s.ext, s.octave - 1);
+      engine.chordOn(midis.map(midiToFreq));
+      setChordLit(true);
+      claimsRef.current.set(i, { type: 'chord' });
     },
-    onPinchMove: (i, at) => {
+    onPinchMove: (i, at, hand) => {
       const claim = claimsRef.current.get(i);
       if (!claim) return;
       if (claim.type === 'knob') {
-        const val = claim.startVal + (claim.startY - at.y) / 220;
+        // Twist: wrist roll turns the knob. Mouse fallback: vertical drag.
+        const val = claim.twist
+          ? claim.startVal + normAngle(hand.roll - claim.startRoll) / TWIST_FULL
+          : claim.startVal + (claim.startY - at.y) / 220;
         engine.setParam(claim.param, val);
         setParams({ ...engine.params });
-      } else if (claim.type === 'melody') {
+      } else if (claim.type === 'slider') {
         const s = settingsRef.current;
-        const degree = yToDegree(at.y);
+        const degree = sliderDegree(claim.which, at.y);
         const midi = degreeToMidi(s.keyIndex, s.scaleId, degree, s.octave);
-        melodyStateRef.current = { degree, midi };
-        const bend = Math.max(-BEND_RANGE, Math.min(BEND_RANGE, (at.x - claim.startX) / BEND_PX));
-        engine.setFreq(midiToFreq(midi + bend));
-        setLastNote(midiName(midi));
-        setMelodyDegree(degree);
+        const bend = Math.max(
+          -BEND_RANGE,
+          Math.min(BEND_RANGE, (at.x - claim.centerX) / BEND_PX),
+        );
+        engine.setFreq(claim.which, midiToFreq(midi + bend));
+        setVoiceDegrees((prev) => prev.map((d, k) => (k === claim.which ? degree : d)));
       }
     },
     onPinchEnd: (i) => {
       const claim = claimsRef.current.get(i);
       claimsRef.current.delete(i);
       if (!claim) return;
-      if (claim.type === 'melody') {
-        engine.noteOff();
-        setMelodyDegree(null);
+      if (claim.type === 'slider') {
+        engine.noteOff(claim.which);
+        setVoiceLive((prev) => prev.map((v, k) => (k === claim.which ? false : v)));
       } else if (claim.type === 'chord') {
         engine.chordOff();
         setChordLit(false);
@@ -243,20 +269,7 @@ export default function Instrument() {
     },
   });
 
-  // Per-frame: expression hand sweeps the filter with height (no pinch needed).
-  useEffect(() => {
-    if (!engine.isRunning || frame.hands.length === 0) return;
-    frame.hands.forEach((hand, i) => {
-      if (claimsRef.current.has(i)) return;
-      if (roleOf(frame.hands, i) !== 'expression') return;
-      if (overAnyPanel(hand.cursor)) return;
-      const norm = 1 - Math.min(1, Math.max(0, (hand.cursor.y / window.innerHeight - 0.1) / 0.78));
-      engine.sweepCutoff(norm);
-      setParams((p) => (Math.abs(p.cutoff - norm) > 0.005 ? { ...p, cutoff: norm } : p));
-    });
-  }, [frame, engine, roleOf, overAnyPanel]);
-
-  // Hover detection for glow states.
+  // Hover detection for outline highlights.
   const hotControls = useMemo(() => {
     const hot = new Set<string>();
     for (const hand of frame.hands) {
@@ -267,7 +280,7 @@ export default function Instrument() {
     return hot;
   }, [frame]);
 
-  // Pitch ladder entries, top = highest.
+  // Ladder between the two sliders, top = highest degree.
   const ladder = useMemo(() => {
     const rows: Array<{ degree: number; name: string }> = [];
     for (let d = degreeCount - 1; d >= 0; d--) {
@@ -276,11 +289,14 @@ export default function Instrument() {
     return rows;
   }, [degreeCount, keyIndex, scaleId, octave]);
 
+  const voiceNote = (which: number) =>
+    midiName(degreeToMidi(keyIndex, scaleId, voiceDegrees[which] ?? 0, octave));
+
   const fmtPct = (v: number) => `${Math.round(v * 100)}`;
 
   return (
     <div className="gw-root" data-testid="instrument">
-      {/* ---- Top strip: brand, scope, power, status ---- */}
+      {/* ---- Top strip ---- */}
       <section className="gw-panel gw-top" ref={registerPanel('top')}>
         <div className="gw-brand">
           <span className="gw-brand-name">Programma GW-1</span>
@@ -288,7 +304,9 @@ export default function Instrument() {
         </div>
         <div className="gw-scope-wrap">
           <Scope engine={engine} />
-          <span className="gw-scope-note" data-testid="note-readout">{lastNote}</span>
+          <span className="gw-scope-note" data-testid="note-readout">
+            {voiceLive[0] ? voiceNote(0) : '·'} / {voiceLive[1] ? voiceNote(1) : '·'}
+          </span>
         </div>
         <button
           className={`gw-power ${audioOn ? 'gw-power-on' : ''}`}
@@ -335,10 +353,45 @@ export default function Instrument() {
             />
           ))}
         </div>
-        <div className="gw-silkscreen">
-          f<sub>osc</sub> = f·2<sup>b/12</sup> · · · · · ▸ lp24
-        </div>
+        <div className="gw-silkscreen">pinch + twist wrist · f·2<sup>b/12</sup></div>
       </section>
+
+      {/* ---- Center: two pitch sliders + ladder ---- */}
+      <div className="gw-sliders">
+        <Slider
+          index={0}
+          degree={voiceDegrees[0]}
+          degreeCount={degreeCount}
+          noteName={voiceNote(0)}
+          playing={voiceLive[0]}
+          hot={hotControls.has('slider:0')}
+          registerRef={registerControl('slider:0')}
+        />
+        <div className="gw-ladder" aria-hidden>
+          {ladder.map((row) => (
+            <div
+              key={row.degree}
+              className={`gw-ladder-row ${
+                (voiceLive[0] && voiceDegrees[0] === row.degree) ||
+                (voiceLive[1] && voiceDegrees[1] === row.degree)
+                  ? 'gw-ladder-hit'
+                  : ''
+              }`}
+            >
+              {row.name}
+            </div>
+          ))}
+        </div>
+        <Slider
+          index={1}
+          degree={voiceDegrees[1]}
+          degreeCount={degreeCount}
+          noteName={voiceNote(1)}
+          playing={voiceLive[1]}
+          hot={hotControls.has('slider:1')}
+          registerRef={registerControl('slider:1')}
+        />
+      </div>
 
       {/* ---- Right panel: KEY ---- */}
       <section className="gw-panel gw-right" ref={registerPanel('right')}>
@@ -347,7 +400,7 @@ export default function Instrument() {
           {NOTE_NAMES.map((n, i) => (
             <button
               key={n}
-              className={`gw-key ${i === keyIndex ? 'gw-active' : ''} ${hotControls.has(`key:${i}`) ? 'gw-hot' : ''} ${n.includes('#') ? 'gw-key-sharp' : ''}`}
+              className={`gw-key ${i === keyIndex ? 'gw-active' : ''} ${hotControls.has(`key:${i}`) ? 'gw-hot' : ''}`}
               ref={registerControl(`key:${i}`) as unknown as Ref<HTMLButtonElement>}
               data-testid={`key-${i}`}
             >
@@ -399,32 +452,17 @@ export default function Instrument() {
             </button>
           ))}
         </div>
-        <div className="gw-silkscreen">⊕ regen mix ∂ · · · ▸ {NOTE_NAMES[keyIndex]} {SCALES[scaleId].label.toLowerCase()}</div>
+        <div className="gw-silkscreen">⊕ trigger routing · {NOTE_NAMES[keyIndex]} {SCALES[scaleId].label.toLowerCase()}</div>
       </section>
-
-      {/* ---- Pitch ladder ---- */}
-      <div className="gw-ladder" aria-hidden>
-        {ladder.map((row) => (
-          <div
-            key={row.degree}
-            className={`gw-ladder-row ${melodyDegree === row.degree ? 'gw-ladder-hit' : ''}`}
-          >
-            <span className="gw-ladder-tick" />
-            {row.name}
-          </div>
-        ))}
-      </div>
 
       {/* ---- Bottom hint ---- */}
       <footer className="gw-panel gw-hint" ref={registerPanel('hint')}>
         {audioOn ? (
           <>
-            <b>right hand</b> height = note · pinch = play · drift sideways = bend
-            <span className="gw-hint-sep">◆</span>
-            <b>left hand</b> height = filter · pinch = chord
+            pinch a <b>slider</b> = note · pull sideways = bend · pinch <b>open air</b> = chord · pinch a <b>knob</b> + twist wrist
           </>
         ) : (
-          <>press <b>power</b> to arm the synthesizer {source === 'camera' ? '· then raise your hands' : '· mouse mode: click = pinch'}</>
+          <>press <b>power</b> to arm {source === 'camera' ? '· then raise your hands' : '· mouse mode: click = pinch'}</>
         )}
       </footer>
     </div>
