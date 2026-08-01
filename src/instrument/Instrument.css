@@ -199,16 +199,14 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* ---- Melody ruler ---- */
+/* ---- Melody ruler — horizontal along the top, left = low ---- */
 .gw-ruler-wrap {
   position: absolute;
-  right: 96px;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 72%;
+  top: 116px;
+  left: 12%;
+  right: 12%;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
   gap: 8px;
   z-index: 20;
 }
@@ -222,37 +220,37 @@
 
 .gw-ruler {
   position: relative;
-  flex: 1;
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
-  align-items: flex-end;
-  padding: 0 2px;
+  align-items: flex-start;
+  padding-top: 3px;
 }
 
-/* the single vertical line the ticks hang off */
-.gw-ruler::after {
+/* the single horizontal line the ticks hang off */
+.gw-ruler::before {
   content: '';
   position: absolute;
-  right: 2px;
+  left: 0;
+  right: 0;
   top: 0;
-  bottom: 0;
-  width: 1px;
+  height: 1px;
   background: var(--ink);
 }
 
 .gw-ruler-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
+  width: 4%;
   font-size: 8.5px;
   color: var(--ink);
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.9);
 }
 
 .gw-ruler-tick {
-  width: 10px;
-  height: 1px;
+  width: 1px;
+  height: 8px;
   background: var(--hairline);
 }
 
@@ -261,7 +259,7 @@
 }
 
 .gw-ruler-root .gw-ruler-tick {
-  width: 18px;
+  height: 15px;
   background: var(--ink);
 }
 
@@ -277,9 +275,16 @@
 }
 
 .gw-ruler-hit .gw-ruler-tick {
-  width: 26px;
-  height: 3px;
+  width: 3px;
+  height: 20px;
   background: var(--ink);
+}
+
+.gw-ruler-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 /* ---- Tab rail ---- */
@@ -618,7 +623,11 @@
     font-size: 14px;
   }
   .gw-ruler-wrap {
-    right: 84px;
+    left: 6%;
+    right: 6%;
+  }
+  .gw-ruler-name {
+    font-size: 7px;
   }
   .gw-sheet {
     right: 84px;

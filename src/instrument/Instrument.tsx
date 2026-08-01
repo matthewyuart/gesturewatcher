@@ -224,16 +224,17 @@ export default function Instrument() {
   }, [engine]);
 
   /**
-   * Note for a melody finger at a given screen height. The ruler mapping is
-   * fixed chromatic; the finger picks the snap set:
+   * Note for a melody finger at a given horizontal hand position — the
+   * ruler runs along the top, left = low, right = high, matching its
+   * 12%..88% span. Fixed chromatic mapping; the finger picks the snap set:
    *   index (0) = white keys · middle (1) = black keys · ring (2) = slide,
    * where slide snaps per AUTO (chord-fitting scale) or FREE (chromatic).
    * No bend anywhere — the displayed note is always the sounding note.
    */
-  const melodyMidiFor = useCallback((finger: number, y: number): number => {
+  const melodyMidiFor = useCallback((finger: number, x: number): number => {
     const s = stateRef.current;
-    const yn = Math.min(1, Math.max(0, (y / window.innerHeight - 0.12) / 0.72));
-    const midi = 12 * (s.melodyOctave + 1) + Math.round((1 - yn) * (RULER_SPAN - 1));
+    const xn = Math.min(1, Math.max(0, (x / window.innerWidth - 0.12) / 0.76));
+    const midi = 12 * (s.melodyOctave + 1) + Math.round(xn * (RULER_SPAN - 1));
     if (finger === 0) return snapToSet(midi, WHITE_SET);
     if (finger === 1) return snapToSet(midi, BLACK_SET);
     if (s.melodyMode === 'free') return midi;
@@ -477,7 +478,7 @@ export default function Instrument() {
       }
 
       if (finger !== null) {
-        const midi = melodyMidiFor(isMouse ? 2 : finger, hand.cursor.y);
+        const midi = melodyMidiFor(isMouse ? 2 : finger, hand.cursor.x);
         if (cur?.hand !== i) {
           engine.noteOn(0, midiToFreq(midi));
         } else {
@@ -562,7 +563,7 @@ export default function Instrument() {
     const base = 12 * (melodyOctave + 1);
     const set = new Set(scaleInfo.steps.map((st) => (scaleInfo.root + st) % 12));
     const rows: Array<{ degree: number; name: string; isRoot: boolean; inScale: boolean }> = [];
-    for (let d = RULER_SPAN - 1; d >= 0; d--) {
+    for (let d = 0; d < RULER_SPAN; d++) {
       const midi = base + d;
       const pc = midi % 12;
       rows.push({
@@ -665,24 +666,26 @@ export default function Instrument() {
       </div>
 
       {/* ---- Melody ruler (right) ---- */}
-      {/* Not a registered panel: pinching while aiming at the ladder must
+      {/* Not a registered panel: pinching while aiming at the ruler must
           play melody, not get swallowed as a UI press. */}
       <div className="gw-ruler-wrap">
-        <button className={`gw-mode ${hotControls.has('mode') ? 'gw-hot' : ''}`} data-testid="mode-toggle" {...btn('mode')}>
-          {melodyMode === 'auto' ? `AUTO · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name.toUpperCase()}` : 'FREE · CHROMATIC'}
-        </button>
         <div className="gw-ruler" data-testid="ruler">
           {ruler.map((row) => (
             <div
               key={row.degree}
               className={`gw-ruler-row ${melodyDegree === row.degree ? 'gw-ruler-hit' : ''} ${row.isRoot ? 'gw-ruler-root' : ''} ${row.inScale ? '' : 'gw-ruler-off'}`}
             >
-              <span className="gw-ruler-name">{row.name}</span>
               <span className="gw-ruler-tick" />
+              <span className="gw-ruler-name">{row.name}</span>
             </div>
           ))}
         </div>
-        <span className="gw-micro">right hand // index=white · middle=black · ring=slide</span>
+        <div className="gw-ruler-caption">
+          <span className="gw-micro">right hand // index=white · middle=black · ring=slide · left=low → right=high</span>
+          <button className={`gw-mode ${hotControls.has('mode') ? 'gw-hot' : ''}`} data-testid="mode-toggle" {...btn('mode')}>
+            {melodyMode === 'auto' ? `AUTO · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name.toUpperCase()}` : 'FREE · CHROMATIC'}
+          </button>
+        </div>
       </div>
 
       {/* ---- Tab rail ---- */}
