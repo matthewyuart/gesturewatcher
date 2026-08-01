@@ -1,16 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
 
-/** Small mirrored camera preview inside the CAM sheet. Tracking runs whether
- *  or not this tile is mounted — this is just a viewfinder. */
-export function CamTile() {
+/** Fullscreen mirrored live camera feed behind the frosted UI. */
+export function VideoBackdrop() {
   const { videoEl, source } = useGestures();
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !videoEl) return;
-    videoEl.className = 'gw-cam-video';
+    videoEl.className = 'video-backdrop-video';
     host.appendChild(videoEl);
     return () => {
       if (videoEl.parentElement === host) host.removeChild(videoEl);
@@ -18,10 +17,9 @@ export function CamTile() {
   }, [videoEl]);
 
   return (
-    <div className="gw-cam-tile" ref={hostRef} data-testid="cam-tile">
-      {(source !== 'camera' || !videoEl) && (
-        <span className="gw-cam-empty">no camera — mouse mode</span>
-      )}
+    <div className="video-backdrop" ref={hostRef}>
+      {(source !== 'camera' || !videoEl) && <div className="video-backdrop-fallback" />}
+      <div className="video-backdrop-tint" />
     </div>
   );
 }

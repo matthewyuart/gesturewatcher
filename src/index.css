@@ -1,14 +1,15 @@
 :root {
-  --bg: #ecebe7;
+  --bg: #f2f1ed;
   --ink: #17161a;
-  --dim: rgba(23, 22, 26, 0.45);
-  --hairline: rgba(23, 22, 26, 0.16);
+  --dim: rgba(23, 22, 26, 0.5);
+  --hairline: rgba(23, 22, 26, 0.18);
+  --frost: rgba(255, 255, 255, 0.68);
 
   --sans: 'Inter', 'Avenir Next', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, 'SF Mono', Consolas, monospace;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Consolas, monospace;
 
   color-scheme: light;
-  font: 15px/1.45 var(--sans);
+  font: 14px/1.45 var(--sans);
   background: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -38,6 +39,37 @@ button {
   background: none;
   border: none;
   cursor: pointer;
+}
+
+/* ---- Live video backdrop ---- */
+.video-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.video-backdrop-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.video-backdrop-fallback {
+  position: absolute;
+  inset: 0;
+  background: #d9d7d1;
+}
+
+.video-backdrop-tint {
+  position: absolute;
+  inset: 0;
+  background: rgba(242, 241, 237, 0.16);
+  pointer-events: none;
 }
 
 .hand-overlay {
