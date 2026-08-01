@@ -167,9 +167,8 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             }
             const cursor = filter.filter(rawX, rawY, t);
 
-            // MediaPipe labels handedness assuming a MIRRORED (selfie) input.
-            // We feed it the raw frame, so its labels are inverted — swap
-            // them to report the user's actual hand.
+            // MediaPipe's labels match the user's actual hands here —
+            // verified live; do not swap them.
             const label = result.handedness[i]?.[0]?.categoryName;
             const screenLm = lm.map((p) => ({ x: (1 - p.x) * vw, y: p.y * vh }));
             // Roll: wrist (0) -> middle MCP (9) axis; 0 = up, +cw on screen.
@@ -178,7 +177,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
               -(screenLm[9].y - screenLm[0].y),
             );
             return {
-              handedness: label === 'Left' ? 'Right' : 'Left',
+              handedness: label === 'Left' ? 'Left' : 'Right',
               cursor,
               pinch: cls.pinch,
               pinchStrength: cls.pinchStrength,
