@@ -251,10 +251,15 @@
   background: var(--ink);
 }
 
+.gw-ruler-off {
+  opacity: 0.32;
+}
+
 .gw-ruler-hit {
   color: var(--ink);
   font-weight: 700;
   font-size: 10.5px;
+  opacity: 1;
 }
 
 .gw-ruler-hit .gw-ruler-tick {
@@ -507,6 +512,54 @@
 .gw-knob-readout {
   font-size: 8px;
   color: var(--dim);
+}
+
+/* ---- Piano voicing editor ---- */
+.gw-piano {
+  position: relative;
+  display: flex;
+  height: 88px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.gw-pkey-w {
+  flex: 1;
+  border-right: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.8);
+  transition: background 0.08s;
+}
+
+.gw-pkey-w:last-of-type {
+  border-right: none;
+}
+
+.gw-pkey-w.gw-pkey-on {
+  background: var(--ink);
+}
+
+.gw-pkey-b {
+  position: absolute;
+  top: 0;
+  width: 9%;
+  height: 55%;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 0 0 3px 3px;
+  z-index: 2;
+  transition: background 0.08s;
+}
+
+.gw-pkey-b.gw-pkey-on {
+  background: var(--bg);
+  box-shadow: inset 0 -6px 0 var(--ink);
+}
+
+.gw-piano-range {
+  text-align: center;
+  display: block;
 }
 
 /* ---- Scope + hint ---- */

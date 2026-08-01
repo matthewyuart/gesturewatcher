@@ -216,7 +216,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
       setStatus('loading');
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: 640, height: 480 },
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
       } catch {

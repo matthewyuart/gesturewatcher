@@ -53,15 +53,22 @@ export function quality(id: QualityId): ChordQuality {
 export interface ChordSlot {
   root: number; // 0..11
   quality: QualityId;
+  /** Exact MIDI notes the slot plays — fully user-editable voicing. */
+  notes: number[];
 }
 
 export function chordName(slot: ChordSlot): string {
   return `${NOTE_NAMES[slot.root]}${quality(slot.quality).label}`;
 }
 
-export function chordMidis(slot: ChordSlot, baseOctave: number): number[] {
-  const rootMidi = 12 * (baseOctave + 1) + slot.root;
-  return quality(slot.quality).intervals.map((iv) => rootMidi + iv);
+/** Default voicing for a root+quality, used until the user edits notes. */
+export function buildChordNotes(
+  root: number,
+  qualityId: QualityId,
+  baseOctave: number,
+): number[] {
+  const rootMidi = 12 * (baseOctave + 1) + root;
+  return quality(qualityId).intervals.map((iv) => rootMidi + iv);
 }
 
 /** MIDI note for the nth degree of a step-pattern scale rooted at `root`. */

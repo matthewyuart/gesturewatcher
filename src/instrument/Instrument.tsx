@@ -5,15 +5,13 @@ import type { Point } from '../gesture/types';
 import { SynthEngine, type SynthParams, type WaveKind } from '../audio/SynthEngine';
 import { DrumMachine, GENRES, type GenreId } from '../audio/DrumMachine';
 import {
+  buildChordNotes,
   CHORD_QUALITIES,
-  CHROMATIC,
-  chordMidis,
   chordName,
   midiName,
   midiToFreq,
   NOTE_NAMES,
   quality,
-  scaleDegreeToMidi,
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
@@ -53,58 +51,51 @@ const SHEETS: Array<{ id: SheetId; label: string }> = [
   { id: 'cam', label: 'track' },
 ];
 
+const CHORD_OCTAVE = 3;
+
+function slot(root: number, q: QualityId): ChordSlot {
+  return { root, quality: q, notes: buildChordNotes(root, q, CHORD_OCTAVE) };
+}
+
 /** Common progressions (after Berklee's list), city pop's royal road first. */
 const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: ChordSlot[] }> = [
   {
     id: 'citypop', label: 'CITY POP', sub: 'IVmaj7–V7–iii7–vi7',
-    slots: [
-      { root: 5, quality: 'maj7' }, { root: 7, quality: 'dom7' },
-      { root: 4, quality: 'min7' }, { root: 9, quality: 'min7' },
-    ],
+    slots: [slot(5, 'maj7'), slot(7, 'dom7'), slot(4, 'min7'), slot(9, 'min7')],
   },
   {
     id: 'pop', label: 'POP', sub: 'I–V–vi–IV',
-    slots: [
-      { root: 0, quality: 'maj' }, { root: 7, quality: 'maj' },
-      { root: 9, quality: 'min' }, { root: 5, quality: 'maj' },
-    ],
+    slots: [slot(0, 'maj'), slot(7, 'maj'), slot(9, 'min'), slot(5, 'maj')],
   },
   {
     id: 'doowop', label: '50S', sub: 'I–vi–IV–V',
-    slots: [
-      { root: 0, quality: 'maj' }, { root: 9, quality: 'min' },
-      { root: 5, quality: 'maj' }, { root: 7, quality: 'maj' },
-    ],
+    slots: [slot(0, 'maj'), slot(9, 'min'), slot(5, 'maj'), slot(7, 'maj')],
   },
   {
     id: 'jazz', label: 'JAZZ', sub: 'ii7–V7–Imaj7–vi7',
-    slots: [
-      { root: 2, quality: 'min7' }, { root: 7, quality: 'dom7' },
-      { root: 0, quality: 'maj7' }, { root: 9, quality: 'min7' },
-    ],
+    slots: [slot(2, 'min7'), slot(7, 'dom7'), slot(0, 'maj7'), slot(9, 'min7')],
   },
   {
     id: 'andalusian', label: 'ANDALUSIAN', sub: 'i–bVII–bVI–V7',
-    slots: [
-      { root: 9, quality: 'min' }, { root: 7, quality: 'maj' },
-      { root: 5, quality: 'maj' }, { root: 4, quality: 'dom7' },
-    ],
+    slots: [slot(9, 'min'), slot(7, 'maj'), slot(5, 'maj'), slot(4, 'dom7')],
   },
   {
     id: 'blues', label: 'BLUES', sub: 'I7–IV7–V7–I7',
-    slots: [
-      { root: 0, quality: 'dom7' }, { root: 5, quality: 'dom7' },
-      { root: 7, quality: 'dom7' }, { root: 0, quality: 'dom7' },
-    ],
+    slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')],
   },
 ];
 
 const BEND_RANGE = 2;
 const BEND_PX = 150;
 const TWIST_FULL = (Math.PI * 3) / 4;
-const CHORD_OCTAVE = 3;
 const BPM_MIN = 60;
 const BPM_MAX = 180;
+/** Fixed chromatic ruler: 2 octaves + 1, anchored at C — never moves. */
+const RULER_SPAN = 25;
+/** Piano editor range: C3..C5 inclusive. */
+const PIANO_LO = 48;
+const PIANO_SPAN = 25;
+const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 
 function inRect(el: Element | null, p: Point): boolean {
   if (!el) return false;
@@ -148,23 +139,18 @@ export default function Instrument() {
   const prevTouchRef = useRef(new Map<number, boolean[]>());
   const activeChordRef = useRef<{ hand: number; finger: number } | null>(null);
 
-  // Melody scale follows the sounding (or last) chord; FREE = chromatic.
+  // Scale that fits the sounding (or last) chord. The ruler itself is a
+  // FIXED chromatic ladder — chord changes never move the note positions;
+  // AUTO mode only changes which rungs the melody snaps to.
   const scaleInfo = useMemo(() => {
-    const slot = chordSlots[activeSlot ?? lastSlot];
-    if (melodyMode === 'free') {
-      return { root: slot.root, steps: CHROMATIC, name: 'chromatic' };
-    }
-    const q = quality(slot.quality);
-    return { root: slot.root, steps: q.scaleSteps, name: q.scaleName };
-  }, [chordSlots, activeSlot, lastSlot, melodyMode]);
-  const degreeCount = scaleInfo.steps.length * 2 + 1;
+    const s = chordSlots[activeSlot ?? lastSlot];
+    const q = quality(s.quality);
+    return { root: s.root, steps: q.scaleSteps, name: q.scaleName };
+  }, [chordSlots, activeSlot, lastSlot]);
+  const degreeCount = RULER_SPAN;
 
-  const stateRef = useRef({ scaleInfo, degreeCount, melodyOctave, chordSlots, source });
-  stateRef.current = { scaleInfo, degreeCount, melodyOctave, chordSlots, source };
-
-  useEffect(() => {
-    setMelodyDegree((d) => (d !== null && d >= degreeCount ? degreeCount - 1 : d));
-  }, [degreeCount]);
+  const stateRef = useRef({ scaleInfo, melodyOctave, melodyMode, chordSlots, source });
+  stateRef.current = { scaleInfo, melodyOctave, melodyMode, chordSlots, source };
 
   // Bass follows the root of the sounding / last chord.
   useEffect(() => {
@@ -204,7 +190,7 @@ export default function Instrument() {
     (slot: number) => {
       if (!engine.isRunning) return;
       const s = stateRef.current;
-      engine.chordOn(chordMidis(s.chordSlots[slot], CHORD_OCTAVE).map(midiToFreq));
+      engine.chordOn(s.chordSlots[slot].notes.map(midiToFreq));
       drumRef.current?.setBassRoot(s.chordSlots[slot].root);
       setActiveSlot(slot);
       setLastSlot(slot);
@@ -217,14 +203,27 @@ export default function Instrument() {
   }, [engine]);
 
   const yToDegree = useCallback((y: number): number => {
-    const dc = stateRef.current.degreeCount;
     const yn = Math.min(1, Math.max(0, (y / window.innerHeight - 0.12) / 0.72));
-    return Math.round((1 - yn) * (dc - 1));
+    return Math.round((1 - yn) * (RULER_SPAN - 1));
   }, []);
 
+  /** Fixed chromatic mapping from ruler degree; AUTO snaps to the nearest
+   *  note of the chord-fitting scale (downward on ties). */
   const melodyMidi = useCallback((degree: number): number => {
     const s = stateRef.current;
-    return scaleDegreeToMidi(s.scaleInfo.root, s.scaleInfo.steps, degree, s.melodyOctave);
+    const midi = 12 * (s.melodyOctave + 1) + degree;
+    if (s.melodyMode === 'free') return midi;
+    const set = new Set(s.scaleInfo.steps.map((st) => (s.scaleInfo.root + st) % 12));
+    for (let d = 0; d <= 6; d++) {
+      if (set.has((((midi - d) % 12) + 12) % 12)) return midi - d;
+      if (set.has((((midi + d) % 12) + 12) % 12)) return midi + d;
+    }
+    return midi;
+  }, []);
+
+  /** Ruler row (chromatic degree) for a midi note, for the highlight. */
+  const midiToDegree = useCallback((midi: number): number => {
+    return midi - 12 * (stateRef.current.melodyOctave + 1);
   }, []);
 
   const xToBpm = useCallback((x: number): number => {
@@ -283,13 +282,40 @@ export default function Instrument() {
         setEditSlot(Number(id.slice(9)));
       } else if (id.startsWith('root:')) {
         const root = Number(id.slice(5));
-        setChordSlots((prev) => prev.map((c, k) => (k === editSlot ? { ...c, root } : c)));
+        setChordSlots((prev) =>
+          prev.map((c, k) =>
+            k === editSlot
+              ? { ...c, root, notes: buildChordNotes(root, c.quality, CHORD_OCTAVE) }
+              : c,
+          ),
+        );
       } else if (id.startsWith('qual:')) {
         const q = id.slice(5) as QualityId;
-        setChordSlots((prev) => prev.map((c, k) => (k === editSlot ? { ...c, quality: q } : c)));
+        setChordSlots((prev) =>
+          prev.map((c, k) =>
+            k === editSlot
+              ? { ...c, quality: q, notes: buildChordNotes(c.root, q, CHORD_OCTAVE) }
+              : c,
+          ),
+        );
       } else if (id.startsWith('preset:')) {
         const preset = PROGRESSIONS.find((p) => p.id === id.slice(7));
-        if (preset) setChordSlots(preset.slots.map((s) => ({ ...s })));
+        if (preset) setChordSlots(preset.slots.map((s) => ({ ...s, notes: [...s.notes] })));
+      } else if (id.startsWith('pk:')) {
+        // Piano voicing editor: toggle an exact MIDI note in the edited slot.
+        const midi = Number(id.slice(3));
+        setChordSlots((prev) =>
+          prev.map((c, k) =>
+            k === editSlot
+              ? {
+                  ...c,
+                  notes: c.notes.includes(midi)
+                    ? c.notes.filter((n) => n !== midi)
+                    : [...c.notes, midi].sort((a, b) => a - b),
+                }
+              : c,
+          ),
+        );
       } else if (id === 'source') {
         setSource(source === 'camera' ? 'mouse' : 'camera');
       }
@@ -379,8 +405,9 @@ export default function Instrument() {
       // Open air: melody for the right hand (mouse hand is 'Right').
       if (!engine.isRunning || hand.handedness !== 'Right') return;
       const degree = yToDegree(at.y);
-      engine.noteOn(0, midiToFreq(melodyMidi(degree)));
-      setMelodyDegree(degree);
+      const midi = melodyMidi(degree);
+      engine.noteOn(0, midiToFreq(midi));
+      setMelodyDegree(midiToDegree(midi));
       claimsRef.current.set(i, { type: 'melody', startX: at.x });
     },
     onPinchMove: (i, at, hand) => {
@@ -395,8 +422,9 @@ export default function Instrument() {
       } else if (claim.type === 'melody') {
         const degree = yToDegree(at.y);
         const bend = Math.max(-BEND_RANGE, Math.min(BEND_RANGE, (at.x - claim.startX) / BEND_PX));
-        engine.setFreq(0, midiToFreq(melodyMidi(degree) + bend));
-        setMelodyDegree(degree);
+        const midi = melodyMidi(degree);
+        engine.setFreq(0, midiToFreq(midi + bend));
+        setMelodyDegree(midiToDegree(midi));
       } else if (claim.type === 'bpmbar') {
         applyBpm(xToBpm(at.x));
       }
@@ -463,13 +491,21 @@ export default function Instrument() {
   }, [frame]);
 
   const ruler = useMemo(() => {
-    const rows: Array<{ degree: number; name: string; isRoot: boolean }> = [];
-    for (let d = degreeCount - 1; d >= 0; d--) {
-      const midi = scaleDegreeToMidi(scaleInfo.root, scaleInfo.steps, d, melodyOctave);
-      rows.push({ degree: d, name: midiName(midi), isRoot: d % scaleInfo.steps.length === 0 });
+    const base = 12 * (melodyOctave + 1);
+    const set = new Set(scaleInfo.steps.map((st) => (scaleInfo.root + st) % 12));
+    const rows: Array<{ degree: number; name: string; isRoot: boolean; inScale: boolean }> = [];
+    for (let d = RULER_SPAN - 1; d >= 0; d--) {
+      const midi = base + d;
+      const pc = midi % 12;
+      rows.push({
+        degree: d,
+        name: midiName(midi),
+        isRoot: pc === scaleInfo.root,
+        inScale: melodyMode === 'free' || set.has(pc),
+      });
     }
     return rows;
-  }, [degreeCount, scaleInfo, melodyOctave]);
+  }, [scaleInfo, melodyOctave, melodyMode]);
 
   // ---- Native (mouse/trackpad) interaction helpers ----
   const knobDrag = useRef<{ param: keyof SynthParams; startY: number; startVal: number } | null>(null);
@@ -569,7 +605,7 @@ export default function Instrument() {
           {ruler.map((row) => (
             <div
               key={row.degree}
-              className={`gw-ruler-row ${melodyDegree === row.degree ? 'gw-ruler-hit' : ''} ${row.isRoot ? 'gw-ruler-root' : ''}`}
+              className={`gw-ruler-row ${melodyDegree === row.degree ? 'gw-ruler-hit' : ''} ${row.isRoot ? 'gw-ruler-root' : ''} ${row.inScale ? '' : 'gw-ruler-off'}`}
             >
               <span className="gw-ruler-name">{row.name}</span>
               <span className="gw-ruler-tick" />
@@ -699,6 +735,46 @@ export default function Instrument() {
                 </button>
               ))}
             </div>
+            <span className="gw-sheet-label">
+              VOICING // {chordSlots[editSlot].notes.map((m) => midiName(m)).join(' · ') || '—'}
+            </span>
+            <div className="gw-piano" data-testid="piano">
+              {(() => {
+                const whites: number[] = [];
+                for (let m = PIANO_LO; m < PIANO_LO + PIANO_SPAN; m++) {
+                  if (WHITE_PCS.includes(m % 12)) whites.push(m);
+                }
+                const whiteW = 100 / whites.length;
+                const notes = chordSlots[editSlot].notes;
+                return (
+                  <>
+                    {whites.map((m) => (
+                      <button
+                        key={m}
+                        className={`gw-pkey-w ${notes.includes(m) ? 'gw-pkey-on' : ''} ${hotControls.has(`pk:${m}`) ? 'gw-hot' : ''}`}
+                        data-testid={`pk-${m}`}
+                        {...btn(`pk:${m}`)}
+                      />
+                    ))}
+                    {Array.from({ length: PIANO_SPAN }, (_, i) => PIANO_LO + i)
+                      .filter((m) => !WHITE_PCS.includes(m % 12))
+                      .map((m) => {
+                        const whitesBefore = whites.filter((w) => w < m).length;
+                        return (
+                          <button
+                            key={m}
+                            className={`gw-pkey-b ${notes.includes(m) ? 'gw-pkey-on' : ''} ${hotControls.has(`pk:${m}`) ? 'gw-hot' : ''}`}
+                            style={{ left: `calc(${whitesBefore * whiteW}% - 4.5%)` }}
+                            data-testid={`pk-${m}`}
+                            {...btn(`pk:${m}`)}
+                          />
+                        );
+                      })}
+                  </>
+                );
+              })()}
+            </div>
+            <span className="gw-piano-range gw-micro">C3 ─────────── C5 · TAP KEYS TO EDIT VOICING</span>
             <p className="gw-sheet-note">
               MELODY AUTO-LOCKS ▸ {NOTE_NAMES[chordSlots[editSlot].root]} {quality(chordSlots[editSlot].quality).scaleName.toUpperCase()}
             </p>

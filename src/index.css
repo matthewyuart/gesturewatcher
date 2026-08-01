@@ -55,7 +55,7 @@ button {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain; /* native aspect — never crop or zoom the feed */
   transform: scaleX(-1);
 }
 
