@@ -48,6 +48,23 @@ export interface Classification {
 const PINCH_ON = 0.32;
 const PINCH_OFF = 0.45;
 
+const FINGER_TIPS = [INDEX_TIP, MIDDLE_TIP, RING_TIP, PINKY_TIP];
+
+/**
+ * Thumb-tip touches per finger (index, middle, ring, pinky), with the same
+ * hysteresis as the pinch. Used for chord triggering on the left hand.
+ */
+export function fingerTouches(
+  lm: NormalizedLandmark[],
+  prev: boolean[],
+): boolean[] {
+  const scale = handScale(lm);
+  return FINGER_TIPS.map((tip, k) => {
+    const ratio = dist(lm[THUMB_TIP], lm[tip]) / scale;
+    return ratio < (prev[k] ? PINCH_OFF : PINCH_ON);
+  });
+}
+
 /**
  * Classify a hand's pose from normalized landmarks.
  * `wasPinching` enables hysteresis so a pinch doesn't flicker at the boundary.

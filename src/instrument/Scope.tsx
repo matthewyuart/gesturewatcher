@@ -26,7 +26,7 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       ctx.clearRect(0, 0, W, H);
 
       // Graticule
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.strokeStyle = 'rgba(23, 22, 26, 0.12)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, H / 2);
@@ -38,7 +38,7 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       ctx.stroke();
 
       const ok = engine.readWaveform(buf);
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = '#17161a';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
       const n = 512;
@@ -63,5 +63,5 @@ export function Scope({ engine }: { engine: SynthEngine }) {
     };
   }, [engine]);
 
-  return <canvas ref={canvasRef} className="gw-scope" width={210} height={56} data-testid="scope" />;
+  return <canvas ref={canvasRef} className="gw-scope" width={180} height={44} data-testid="scope" />;
 }

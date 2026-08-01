@@ -49,6 +49,7 @@ export function useHandEvents(handlers: HandEventHandlers): void {
             pinchStrength: 0,
             pose: 'unknown',
             roll: 0,
+            fingerTouch: [false, false, false, false],
             landmarks: [],
           },
         );

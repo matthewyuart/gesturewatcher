@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-import { classifyHand } from './classify';
+import { classifyHand, fingerTouches } from './classify';
 import { OneEuroPoint } from './oneEuro';
 import type { GestureFrame, GestureSource, GestureStatus, Hand } from './types';
 
@@ -96,6 +96,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
 
     const filters = new Map<number, OneEuroPoint>();
     const wasPinching = new Map<number, boolean>();
+    const wasTouching = new Map<number, boolean[]>();
     let frameCount = 0;
     let fpsWindowStart = performance.now();
 
@@ -112,6 +113,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
           pinchStrength: pinch ? 1 : 0,
           pose: pinch ? 'pinch' : 'point',
           roll: 0,
+          fingerTouch: [pinch, false, false, false],
           landmarks: [],
         },
       ];
@@ -132,6 +134,11 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             const prevPinch = wasPinching.get(i) ?? false;
             const cls = classifyHand(lm, prevPinch);
             wasPinching.set(i, cls.pinch);
+            const touches = fingerTouches(
+              lm,
+              wasTouching.get(i) ?? [false, false, false, false],
+            );
+            wasTouching.set(i, touches);
 
             // Cursor anchor: midpoint of thumb tip + index tip (stable while pinching).
             const rawX = (1 - (lm[4].x + lm[8].x) / 2) * vw;
@@ -157,6 +164,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
               pinchStrength: cls.pinchStrength,
               pose: cls.pose,
               roll,
+              fingerTouch: touches,
               landmarks: screenLm,
             } satisfies Hand;
           });
@@ -165,6 +173,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             if (key >= hands.length) {
               filters.delete(key);
               wasPinching.delete(key);
+              wasTouching.delete(key);
             }
           }
         } catch {

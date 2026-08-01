@@ -245,6 +245,12 @@ export class SynthEngine {
     this.chordVoices = [];
   }
 
+  /** Post-filter bus for the drum machine (present after start()). */
+  getDrumBus(): { ctx: AudioContext; dest: AudioNode } | null {
+    if (!this.ctx) return null;
+    return { ctx: this.ctx, dest: this.master };
+  }
+
   /** Copy the current waveform into `out`; returns false before start(). */
   readWaveform(out: Float32Array): boolean {
     if (!this.ctx || !this.scopeBuf) return false;

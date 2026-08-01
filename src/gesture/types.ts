@@ -22,6 +22,11 @@ export interface Hand {
    * Always 0 in mouse mode (no landmarks).
    */
   roll: number;
+  /**
+   * Thumb-tip touching each fingertip: [index, middle, ring, pinky].
+   * fingerTouch[0] mirrors `pinch`. Mouse mode: [pinch, false, false, false].
+   */
+  fingerTouch: boolean[];
   /** All 21 landmarks in viewport CSS pixels (mirrored), for skeleton drawing. */
   landmarks: Point[];
 }
