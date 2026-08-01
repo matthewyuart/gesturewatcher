@@ -51,8 +51,13 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       }
       ctx.stroke();
 
-      raf = requestAnimationFrame(draw);
-      timer = window.setTimeout(draw, 150);
+      if (engine.isRunning) {
+        raf = requestAnimationFrame(draw);
+        timer = window.setTimeout(draw, 150);
+      } else {
+        // Idle until the synth is armed — no 60fps loop for a flat line.
+        timer = window.setTimeout(draw, 500);
+      }
     };
     draw();
 

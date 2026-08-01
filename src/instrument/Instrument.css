@@ -11,6 +11,9 @@
   font-family: var(--mono);
   color: var(--ink);
   font-size: 12px;
+  /* house style: everything lowercase, nothing bold */
+  text-transform: lowercase;
+  font-weight: 400;
 }
 
 .gw-dim {
@@ -22,7 +25,7 @@
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--ink);
   opacity: 0.75;
   line-height: 1.6;
@@ -58,7 +61,6 @@
 .gw-header,
 .gw-card,
 .gw-mode,
-.gw-ruler,
 .gw-rail,
 .gw-sheet,
 .gw-scope-dock,
@@ -91,7 +93,7 @@
 
 .gw-brand-name {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.04em;
 }
 
@@ -116,9 +118,9 @@
   border: 1px solid var(--ink);
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   transition: background 0.15s, color 0.15s;
 }
 
@@ -175,14 +177,14 @@
 .gw-card-name {
   font-family: var(--sans);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: -0.01em;
 }
 
 .gw-card-id {
   font-size: 8px;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--dim);
 }
 
@@ -219,13 +221,24 @@
 }
 
 .gw-ruler {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 12px 10px;
-  border-radius: 8px;
+  padding: 0 2px;
+}
+
+/* the single vertical line the ticks hang off */
+.gw-ruler::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ink);
 }
 
 .gw-ruler-row {
@@ -233,7 +246,8 @@
   align-items: center;
   gap: 8px;
   font-size: 8.5px;
-  color: var(--dim);
+  color: var(--ink);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.9);
 }
 
 .gw-ruler-tick {
@@ -257,7 +271,7 @@
 
 .gw-ruler-hit {
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 10.5px;
   opacity: 1;
 }
@@ -296,7 +310,7 @@
   border-radius: 4px;
   font-size: 10px;
   letter-spacing: 0.2em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--dim);
   border: 1px solid transparent;
   transition: all 0.12s;
@@ -339,9 +353,9 @@
 
 .gw-sheet-title {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 8px;
 }
@@ -349,7 +363,7 @@
 .gw-sheet-label {
   font-size: 8.5px;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--dim);
   margin-top: 6px;
 }
@@ -395,7 +409,7 @@
   border: 1px solid var(--ink);
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.22em;
 }
 
@@ -506,7 +520,7 @@
 .gw-knob-label {
   font-size: 8px;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: lowercase;
 }
 
 .gw-knob-readout {
@@ -612,5 +626,20 @@
   .gw-sheet-open,
   .gw-sheet-body {
     width: 262px;
+  }
+}
+
+/* ---- Mouse hover (hand-cursor hover uses .gw-hot, camera only) ---- */
+@media (hover: hover) {
+  .gw-pill:hover,
+  .gw-tab:hover,
+  .gw-power:hover,
+  .gw-play:hover,
+  .gw-mode:hover,
+  .gw-card:hover,
+  .gw-knob:hover,
+  .gw-pkey-w:hover,
+  .gw-pkey-b:hover {
+    border-color: var(--ink);
   }
 }

@@ -21,7 +21,6 @@ import './Instrument.css';
 
 type Claim =
   | { type: 'knob'; param: keyof SynthParams; startY: number; startVal: number; startRoll: number; twist: boolean }
-  | { type: 'melody'; startX: number }
   | { type: 'chordSlot'; slot: number }
   | { type: 'bpmbar' }
   | { type: 'pressed' };
@@ -85,8 +84,6 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   },
 ];
 
-const BEND_RANGE = 2;
-const BEND_PX = 150;
 const TWIST_FULL = (Math.PI * 3) / 4;
 const BPM_MIN = 60;
 const BPM_MAX = 180;
@@ -96,6 +93,18 @@ const RULER_SPAN = 25;
 const PIANO_LO = 48;
 const PIANO_SPAN = 25;
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
+const WHITE_SET = new Set(WHITE_PCS);
+const BLACK_SET = new Set([1, 3, 6, 8, 10]);
+const EMPTY_SET: Set<string> = new Set();
+
+/** Nearest midi whose pitch class is in `set` (downward on ties). */
+function snapToSet(midi: number, set: Set<number>): number {
+  for (let d = 0; d <= 6; d++) {
+    if (set.has((((midi - d) % 12) + 12) % 12)) return midi - d;
+    if (set.has((((midi + d) % 12) + 12) % 12)) return midi + d;
+  }
+  return midi;
+}
 
 function inRect(el: Element | null, p: Point): boolean {
   if (!el) return false;
@@ -157,20 +166,32 @@ export default function Instrument() {
     drumRef.current?.setBassRoot(chordSlots[activeSlot ?? lastSlot].root);
   }, [chordSlots, activeSlot, lastSlot]);
 
-  const registerControl = useCallback(
-    (id: string) => (el: HTMLElement | null) => {
-      if (el) controlsRef.current.set(id, el);
-      else controlsRef.current.delete(id);
-    },
-    [],
-  );
-  const registerPanel = useCallback(
-    (id: string) => (el: HTMLElement | null) => {
-      if (el) panelsRef.current.set(id, el);
-      else panelsRef.current.delete(id);
-    },
-    [],
-  );
+  // Ref callbacks are cached per id so React doesn't detach/re-attach every
+  // element ref on every render.
+  const controlRefFns = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const registerControl = useCallback((id: string) => {
+    let fn = controlRefFns.current.get(id);
+    if (!fn) {
+      fn = (el: HTMLElement | null) => {
+        if (el) controlsRef.current.set(id, el);
+        else controlsRef.current.delete(id);
+      };
+      controlRefFns.current.set(id, fn);
+    }
+    return fn;
+  }, []);
+  const panelRefFns = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const registerPanel = useCallback((id: string) => {
+    let fn = panelRefFns.current.get(id);
+    if (!fn) {
+      fn = (el: HTMLElement | null) => {
+        if (el) panelsRef.current.set(id, el);
+        else panelsRef.current.delete(id);
+      };
+      panelRefFns.current.set(id, fn);
+    }
+    return fn;
+  }, []);
 
   const powerOn = useCallback(() => {
     void engine
@@ -202,23 +223,22 @@ export default function Instrument() {
     setActiveSlot(null);
   }, [engine]);
 
-  const yToDegree = useCallback((y: number): number => {
-    const yn = Math.min(1, Math.max(0, (y / window.innerHeight - 0.12) / 0.72));
-    return Math.round((1 - yn) * (RULER_SPAN - 1));
-  }, []);
-
-  /** Fixed chromatic mapping from ruler degree; AUTO snaps to the nearest
-   *  note of the chord-fitting scale (downward on ties). */
-  const melodyMidi = useCallback((degree: number): number => {
+  /**
+   * Note for a melody finger at a given screen height. The ruler mapping is
+   * fixed chromatic; the finger picks the snap set:
+   *   index (0) = white keys · middle (1) = black keys · ring (2) = slide,
+   * where slide snaps per AUTO (chord-fitting scale) or FREE (chromatic).
+   * No bend anywhere — the displayed note is always the sounding note.
+   */
+  const melodyMidiFor = useCallback((finger: number, y: number): number => {
     const s = stateRef.current;
-    const midi = 12 * (s.melodyOctave + 1) + degree;
+    const yn = Math.min(1, Math.max(0, (y / window.innerHeight - 0.12) / 0.72));
+    const midi = 12 * (s.melodyOctave + 1) + Math.round((1 - yn) * (RULER_SPAN - 1));
+    if (finger === 0) return snapToSet(midi, WHITE_SET);
+    if (finger === 1) return snapToSet(midi, BLACK_SET);
     if (s.melodyMode === 'free') return midi;
     const set = new Set(s.scaleInfo.steps.map((st) => (s.scaleInfo.root + st) % 12));
-    for (let d = 0; d <= 6; d++) {
-      if (set.has((((midi - d) % 12) + 12) % 12)) return midi - d;
-      if (set.has((((midi + d) % 12) + 12) % 12)) return midi + d;
-    }
-    return midi;
+    return snapToSet(midi, set);
   }, []);
 
   /** Ruler row (chromatic degree) for a midi note, for the highlight. */
@@ -402,13 +422,8 @@ export default function Instrument() {
           return;
         }
       }
-      // Open air: melody for the right hand (mouse hand is 'Right').
-      if (!engine.isRunning || hand.handedness !== 'Right') return;
-      const degree = yToDegree(at.y);
-      const midi = melodyMidi(degree);
-      engine.noteOn(0, midiToFreq(midi));
-      setMelodyDegree(midiToDegree(midi));
-      claimsRef.current.set(i, { type: 'melody', startX: at.x });
+      // Open air: nothing to claim — melody is handled per-frame by the
+      // right-hand finger effect below (index/middle/ring pick the mode).
     },
     onPinchMove: (i, at, hand) => {
       const claim = claimsRef.current.get(i);
@@ -419,12 +434,6 @@ export default function Instrument() {
           : claim.startVal + (claim.startY - at.y) / 220;
         engine.setParam(claim.param, val);
         setParams({ ...engine.params });
-      } else if (claim.type === 'melody') {
-        const degree = yToDegree(at.y);
-        const bend = Math.max(-BEND_RANGE, Math.min(BEND_RANGE, (at.x - claim.startX) / BEND_PX));
-        const midi = melodyMidi(degree);
-        engine.setFreq(0, midiToFreq(midi + bend));
-        setMelodyDegree(midiToDegree(midi));
       } else if (claim.type === 'bpmbar') {
         applyBpm(xToBpm(at.x));
       }
@@ -432,15 +441,57 @@ export default function Instrument() {
     onPinchEnd: (i) => {
       const claim = claimsRef.current.get(i);
       claimsRef.current.delete(i);
-      if (!claim) return;
-      if (claim.type === 'melody') {
-        engine.noteOff(0);
-        setMelodyDegree(null);
-      } else if (claim.type === 'chordSlot') {
-        chordOffAll();
-      }
+      if (claim?.type === 'chordSlot') chordOffAll();
     },
   });
+
+  // Right hand: index / middle / ring touches play melody as a finger-piano:
+  // index = white keys, middle = black keys, ring = slide. Mouse mode's
+  // single "pinch" acts as the slide finger.
+  const melodyHoldRef = useRef<{ hand: number; finger: number } | null>(null);
+  const prevRightTouchRef = useRef(new Map<number, boolean[]>());
+  useEffect(() => {
+    if (!engine.isRunning) return;
+    const stopMelody = () => {
+      engine.noteOff(0);
+      melodyHoldRef.current = null;
+      setMelodyDegree(null);
+    };
+    const seen = new Set<number>();
+    frame.hands.forEach((hand, i) => {
+      if (hand.handedness !== 'Right') return;
+      seen.add(i);
+      const isMouse = hand.landmarks.length !== 21;
+      const touches = hand.fingerTouch;
+      const prev = prevRightTouchRef.current.get(i) ?? [false, false, false, false];
+      prevRightTouchRef.current.set(i, touches);
+      const uiClaim = claimsRef.current.get(i);
+      const cur = melodyHoldRef.current;
+
+      let finger: number | null = null;
+      if (!uiClaim) {
+        // Newest touch wins; otherwise keep the held finger; otherwise any.
+        for (const k of [0, 1, 2]) if (touches[k] && !prev[k]) finger = k;
+        if (finger === null && cur?.hand === i && touches[cur.finger]) finger = cur.finger;
+        if (finger === null) finger = [0, 1, 2].find((k) => touches[k]) ?? null;
+      }
+
+      if (finger !== null) {
+        const midi = melodyMidiFor(isMouse ? 2 : finger, hand.cursor.y);
+        if (cur?.hand !== i) {
+          engine.noteOn(0, midiToFreq(midi));
+        } else {
+          // Discrete fingers step instantly; the slide finger glides.
+          engine.setFreq(0, midiToFreq(midi), finger === 2 || isMouse ? 0.05 : 0.008);
+        }
+        melodyHoldRef.current = { hand: i, finger };
+        setMelodyDegree(midiToDegree(midi));
+      } else if (cur?.hand === i) {
+        stopMelody();
+      }
+    });
+    if (melodyHoldRef.current && !seen.has(melodyHoldRef.current.hand)) stopMelody();
+  }, [frame, engine, melodyMidiFor, midiToDegree]);
 
   // Left hand: thumb-to-finger touches trigger the four chord slots.
   useEffect(() => {
@@ -480,15 +531,32 @@ export default function Instrument() {
     }
   }, [frame, engine, chordOnSlot, chordOffAll]);
 
+  // Hover highlights for hand cursors. Mouse mode uses plain CSS :hover, so
+  // this only runs on camera, against rects cached for 400ms (no per-frame
+  // layout reads).
+  const rectCacheRef = useRef<{ t: number; rects: Array<[string, DOMRect]> }>({ t: 0, rects: [] });
   const hotControls = useMemo(() => {
+    if (source !== 'camera' || frame.hands.length === 0) return EMPTY_SET;
+    const now = performance.now();
+    if (now - rectCacheRef.current.t > 400) {
+      rectCacheRef.current = {
+        t: now,
+        rects: [...controlsRef.current].map(([id, el]) => [id, el.getBoundingClientRect()]),
+      };
+    }
     const hot = new Set<string>();
     for (const hand of frame.hands) {
-      for (const [id, el] of controlsRef.current) {
-        if (inRect(el, hand.cursor)) hot.add(id);
+      for (const [id, r] of rectCacheRef.current.rects) {
+        if (
+          hand.cursor.x >= r.left && hand.cursor.x <= r.right &&
+          hand.cursor.y >= r.top && hand.cursor.y <= r.bottom
+        ) {
+          hot.add(id);
+        }
       }
     }
     return hot;
-  }, [frame]);
+  }, [frame, source]);
 
   const ruler = useMemo(() => {
     const base = 12 * (melodyOctave + 1);
@@ -612,7 +680,7 @@ export default function Instrument() {
             </div>
           ))}
         </div>
-        <span className="gw-micro">RIGHT HAND // PINCH = PLAY</span>
+        <span className="gw-micro">right hand // index=white · middle=black · ring=slide</span>
       </div>
 
       {/* ---- Tab rail ---- */}
@@ -850,7 +918,7 @@ export default function Instrument() {
       </div>
       <footer className="gw-hint" ref={registerPanel('hint')}>
         {audioOn ? (
-          <>R.HAND PINCH = MELODY // L.HAND THUMB+FINGER = CHORDS // PULL SIDEWAYS = BEND</>
+          <>r.hand: index=white · middle=black · ring=slide // l.hand: fingers=chords</>
         ) : (
           <>PRESS POWER TO ARM{source === 'mouse' ? ' // MOUSE MODE: CLICK = PINCH' : ' // RAISE BOTH HANDS'}</>
         )}

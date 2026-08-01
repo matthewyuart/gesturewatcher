@@ -36,6 +36,7 @@ body {
 button {
   font: inherit;
   color: inherit;
+  text-transform: inherit;
   background: none;
   border: none;
   cursor: pointer;

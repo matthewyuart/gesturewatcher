@@ -30,6 +30,22 @@ interface GestureContextValue {
 
 const EMPTY_FRAME: GestureFrame = { hands: [], t: 0 };
 
+function handsEqual(a: Hand[], b: Hand[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x.pinch !== y.pinch || x.pose !== y.pose) return false;
+    if (Math.abs(x.cursor.x - y.cursor.x) > 0.3) return false;
+    if (Math.abs(x.cursor.y - y.cursor.y) > 0.3) return false;
+    if (Math.abs(x.roll - y.roll) > 0.01) return false;
+    for (let k = 0; k < 4; k++) {
+      if (x.fingerTouch[k] !== y.fingerTouch[k]) return false;
+    }
+  }
+  return true;
+}
+
 const GestureContext = createContext<GestureContextValue | null>(null);
 
 export function useGestures(): GestureContextValue {
@@ -97,6 +113,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
     const filters = new Map<number, OneEuroPoint>();
     const wasPinching = new Map<number, boolean>();
     const wasTouching = new Map<number, boolean[]>();
+    let lastHands: Hand[] = [];
     let frameCount = 0;
     let fpsWindowStart = performance.now();
 
@@ -188,7 +205,12 @@ export function GestureProvider({ children }: { children: ReactNode }) {
         fpsWindowStart = t;
       }
 
-      setFrame({ hands, t });
+      // Skip the React update when nothing observable changed — kills
+      // per-frame re-renders while hands are absent or perfectly still.
+      if (!handsEqual(lastHands, hands)) {
+        lastHands = hands;
+        setFrame({ hands, t });
+      }
       schedule();
     };
 
