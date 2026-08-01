@@ -665,7 +665,9 @@ export default function Instrument() {
       </div>
 
       {/* ---- Melody ruler (right) ---- */}
-      <div className="gw-ruler-wrap" ref={registerPanel('ruler')}>
+      {/* Not a registered panel: pinching while aiming at the ladder must
+          play melody, not get swallowed as a UI press. */}
+      <div className="gw-ruler-wrap">
         <button className={`gw-mode ${hotControls.has('mode') ? 'gw-hot' : ''}`} data-testid="mode-toggle" {...btn('mode')}>
           {melodyMode === 'auto' ? `AUTO · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name.toUpperCase()}` : 'FREE · CHROMATIC'}
         </button>
