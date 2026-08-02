@@ -57,8 +57,16 @@ export interface ChordSlot {
   notes: number[];
 }
 
+const FLAT_NAMES = [
+  'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B',
+] as const;
+
 export function chordName(slot: ChordSlot): string {
-  return `${NOTE_NAMES[slot.root]}${quality(slot.quality).label}`;
+  // Black-key roots read as flats (Bb, Eb…), matching the staff spelling.
+  const name = [1, 3, 6, 8, 10].includes(slot.root)
+    ? FLAT_NAMES[slot.root]
+    : NOTE_NAMES[slot.root];
+  return `${name}${quality(slot.quality).label}`;
 }
 
 /** Default voicing for a root+quality, used until the user edits notes. */

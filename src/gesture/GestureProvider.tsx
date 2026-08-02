@@ -114,6 +114,27 @@ export function GestureProvider({ children }: { children: ReactNode }) {
     const wasPinching = new Map<number, boolean>();
     const wasTouching = new Map<number, boolean[]>();
     let lastHands: Hand[] = [];
+
+    // Landmarks are normalized to the CAMERA FRAME. The video renders
+    // letterboxed (object-fit: contain) inside an inset stage, so map to the
+    // video's actual displayed content rect — otherwise the cursor drifts
+    // away from the on-screen hand. Cached; falls back to the viewport.
+    let vrCache: { t: number; r: { left: number; top: number; w: number; h: number } | null } = { t: 0, r: null };
+    const videoContentRect = () => {
+      if (!video || !video.videoWidth || !video.isConnected) return null;
+      if (performance.now() - vrCache.t > 500) {
+        const el = video.getBoundingClientRect();
+        let r = null;
+        if (el.width > 0 && el.height > 0) {
+          const s = Math.min(el.width / video.videoWidth, el.height / video.videoHeight);
+          const w = video.videoWidth * s;
+          const h = video.videoHeight * s;
+          r = { left: el.left + (el.width - w) / 2, top: el.top + (el.height - h) / 2, w, h };
+        }
+        vrCache = { t: performance.now(), r };
+      }
+      return vrCache.r;
+    };
     let frameCount = 0;
     let fpsWindowStart = performance.now();
 
@@ -143,8 +164,11 @@ export function GestureProvider({ children }: { children: ReactNode }) {
       if (sourceRef.current === 'mouse' || !landmarker || !video) {
         hands = mouseHand();
       } else {
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
+        const vr = videoContentRect();
+        const left = vr ? vr.left : 0;
+        const top = vr ? vr.top : 0;
+        const vw = vr ? vr.w : window.innerWidth;
+        const vh = vr ? vr.h : window.innerHeight;
         try {
           const result = landmarker.detectForVideo(video, t);
           hands = result.landmarks.map((lm, i) => {
@@ -158,8 +182,8 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             wasTouching.set(i, touches);
 
             // Cursor anchor: midpoint of thumb tip + index tip (stable while pinching).
-            const rawX = (1 - (lm[4].x + lm[8].x) / 2) * vw;
-            const rawY = ((lm[4].y + lm[8].y) / 2) * vh;
+            const rawX = left + (1 - (lm[4].x + lm[8].x) / 2) * vw;
+            const rawY = top + ((lm[4].y + lm[8].y) / 2) * vh;
             let filter = filters.get(i);
             if (!filter) {
               filter = new OneEuroPoint();
@@ -170,7 +194,7 @@ export function GestureProvider({ children }: { children: ReactNode }) {
             // MediaPipe's labels match the user's actual hands here —
             // verified live; do not swap them.
             const label = result.handedness[i]?.[0]?.categoryName;
-            const screenLm = lm.map((p) => ({ x: (1 - p.x) * vw, y: p.y * vh }));
+            const screenLm = lm.map((p) => ({ x: left + (1 - p.x) * vw, y: top + p.y * vh }));
             // Roll: wrist (0) -> middle MCP (9) axis; 0 = up, +cw on screen.
             const roll = Math.atan2(
               screenLm[9].x - screenLm[0].x,

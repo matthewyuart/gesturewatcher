@@ -10,17 +10,20 @@ const STAFF_LEFT = 4;
 const STAFF_RIGHT = 166;
 const NOTE_X = 100; // base x of the chord's notehead column
 
-// pitch class -> diatonic letter index (sharps spelled: C# = C-line + sharp)
-const DIATONIC = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-const IS_SHARP = [
+// pitch class -> diatonic letter index.
+// Sharp spelling: C# sits on the C line with ♯; flat spelling: the same
+// pitch sits on the D line with ♭ (Db). Chosen per chord by `preferFlats`.
+const SHARP_DIATONIC = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+const FLAT_DIATONIC = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
+const IS_BLACK = [
   false, true, false, true, false, false,
   true, false, true, false, true, false,
 ];
 
-function midiToStep(midi: number): number {
+function midiToStep(midi: number, preferFlats: boolean): number {
   const pc = ((midi % 12) + 12) % 12;
   const octave = Math.floor(midi / 12) - 1;
-  return octave * 7 + DIATONIC[pc];
+  return octave * 7 + (preferFlats ? FLAT_DIATONIC : SHARP_DIATONIC)[pc];
 }
 
 function stepToY(step: number): number {
@@ -32,13 +35,13 @@ type NoteGlyph = {
   step: number;
   x: number;
   y: number;
-  sharp: boolean;
+  accidental: string | null;
   sharpX: number;
 };
 
 type LedgerLine = { y: number; x1: number; x2: number };
 
-function layoutNotes(midis: number[]): { notes: NoteGlyph[]; ledgers: LedgerLine[] } {
+function layoutNotes(midis: number[], preferFlats: boolean): { notes: NoteGlyph[]; ledgers: LedgerLine[] } {
   const sorted = [...new Set(midis)].sort((a, b) => a - b);
 
   const notes: NoteGlyph[] = [];
@@ -49,23 +52,23 @@ function layoutNotes(midis: number[]): { notes: NoteGlyph[]; ledgers: LedgerLine
 
   for (const midi of sorted) {
     const pc = ((midi % 12) + 12) % 12;
-    const step = midiToStep(midi);
+    const step = midiToStep(midi, preferFlats);
 
     // seconds (or same staff position): kick the upper note right
     const offset: boolean = step - prevStep <= 1 && !prevOffset;
     const x = offset ? NOTE_X + 9 : NOTE_X;
 
     // stagger accidentals into two columns when vertically crowded
-    const sharp = IS_SHARP[pc];
+    const accidental = IS_BLACK[pc] ? (preferFlats ? '\u266d' : '\u266f') : null;
     let sharpCol = 0;
-    if (sharp) {
+    if (accidental) {
       sharpCol = step - prevSharpStep < 4 ? (prevSharpCol + 1) % 2 : 0;
       prevSharpStep = step;
       prevSharpCol = sharpCol;
     }
     const sharpX = NOTE_X - 13 - sharpCol * 8;
 
-    notes.push({ midi, step, x, y: stepToY(step), sharp, sharpX });
+    notes.push({ midi, step, x, y: stepToY(step), accidental, sharpX });
     prevStep = step;
     prevOffset = offset;
   }
@@ -97,8 +100,8 @@ function layoutNotes(midis: number[]): { notes: NoteGlyph[]; ledgers: LedgerLine
   return { notes, ledgers };
 }
 
-export function StaffChord({ midis, label }: { midis: number[]; label: string }) {
-  const { notes, ledgers } = layoutNotes(midis);
+export function StaffChord({ midis, label, preferFlats = false }: { midis: number[]; label: string; preferFlats?: boolean }) {
+  const { notes, ledgers } = layoutNotes(midis, preferFlats);
 
   return (
     <div className="gw-staff-card" data-testid="staff-card">
@@ -154,7 +157,7 @@ export function StaffChord({ midis, label }: { midis: number[]; label: string })
         {/* noteheads + accidentals */}
         {notes.map((n) => (
           <g key={n.midi}>
-            {n.sharp && (
+            {n.accidental && (
               <text
                 x={n.sharpX}
                 y={n.y}
@@ -163,7 +166,7 @@ export function StaffChord({ midis, label }: { midis: number[]; label: string })
                 textAnchor="middle"
                 dominantBaseline="central"
               >
-                {'♯'}
+                {n.accidental}
               </text>
             )}
             <ellipse

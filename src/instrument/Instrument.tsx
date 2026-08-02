@@ -67,9 +67,38 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   { id: 'blues', label: 'blues', sub: 'i7–iv7–v7–i7', slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')] },
 ];
 
-/** Displacement map for the glass filter: R encodes x, G encodes y. */
-const GLASS_MAP =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><defs><linearGradient id='x' x1='0' x2='1' y1='0' y2='0'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%23ff0000'/></linearGradient><linearGradient id='y' x1='0' x2='0' y1='0' y2='1'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%2300ff00'/></linearGradient></defs><rect width='64' height='64' fill='url(%23x)'/><rect width='64' height='64' fill='url(%23y)' style='mix-blend-mode:screen'/></svg>";
+/**
+ * Lens displacement map for the glass filter, following the liquid-glass
+ * reference implementations: NEUTRAL (127.5) in the center so the panel
+ * interior is undistorted, with displacement growing smoothly toward the
+ * edges (cubic falloff) — a hard/linear map produces visible stripes.
+ * R encodes x-displacement, G encodes y. Generated once on a canvas so the
+ * channel encoding is exact (no SVG blend-mode ambiguity).
+ */
+function makeLensMap(): string {
+  const S = 128;
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const ctx = c.getContext('2d');
+  if (!ctx) return '';
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const nx = (x / (S - 1)) * 2 - 1;
+      const ny = (y / (S - 1)) * 2 - 1;
+      const edge = Math.min(1, Math.max(Math.abs(nx), Math.abs(ny)));
+      const fall = edge * edge * edge;
+      const i = (y * S + x) * 4;
+      img.data[i] = Math.round(127.5 + nx * fall * 127.5);
+      img.data[i + 1] = Math.round(127.5 + ny * fall * 127.5);
+      img.data[i + 2] = 0;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL();
+}
 
 /** Edge refraction layer. Inline style so the fragment url resolves against
  *  the document (external CSS would resolve it against the stylesheet). */
@@ -119,6 +148,7 @@ function normAngle(a: number): number {
 
 export default function Instrument() {
   const { frame, status, source, fps, setSource, videoEl } = useGestures();
+  const [glassMap] = useState(() => makeLensMap());
   const engineRef = useRef<SynthEngine | null>(null);
   if (!engineRef.current) engineRef.current = new SynthEngine();
   const engine = engineRef.current;
@@ -173,7 +203,7 @@ export default function Instrument() {
           sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
         }
         const luma = sum / (d.length / 4) / 255;
-        const next = Math.min(0.74, Math.max(0.3, 0.26 + luma * 0.6));
+        const next = Math.min(0.85, Math.max(0.45, 0.42 + luma * 0.5));
         setShade((prev) => (Math.abs(prev - next) > 0.03 ? next : prev));
       } catch {
         // frame not ready — try again next tick
@@ -257,9 +287,12 @@ export default function Instrument() {
 
   const rulerRect = useCallback((): DOMRect | null => {
     if (performance.now() - rulerRectRef.current.t > 1000) {
+      const r = rulerElRef.current?.getBoundingClientRect() ?? null;
       rulerRectRef.current = {
         t: performance.now(),
-        r: rulerElRef.current?.getBoundingClientRect() ?? null,
+        // A collapsed/hidden layout reports zero-size rects — treat as absent
+        // so the mapping falls back instead of dividing by zero.
+        r: r && r.width > 8 ? r : null,
       };
     }
     return rulerRectRef.current.r;
@@ -277,7 +310,7 @@ export default function Instrument() {
     const xn = r
       ? Math.min(1, Math.max(0, (x - r.left) / r.width))
       : Math.min(1, Math.max(0, (x / window.innerWidth - 0.12) / 0.76));
-    const midi = 12 * (s.melodyOctave + 1) + Math.round(xn * (RULER_SPAN - 1));
+    const midi = 12 * (s.melodyOctave + 1) + Math.round((Number.isFinite(xn) ? xn : 0.5) * (RULER_SPAN - 1));
     if (finger === 0) return snapToSet(midi, WHITE_SET);
     if (finger === 1) return snapToSet(midi, BLACK_SET);
     if (s.melodyMode === 'free') return midi;
@@ -605,6 +638,8 @@ export default function Instrument() {
 
   // Floating staff card follows the left (chord) hand.
   const staffSlot = chordSlots[activeSlot ?? lastSlot];
+  // Flat-side roots (F, Bb, Eb, Ab, Db, Gb) spell black keys as flats.
+  const staffFlats = [5, 10, 3, 8, 1, 6].includes(staffSlot.root);
   const staffPos = useMemo(() => {
     const stage = stageRef.current?.getBoundingClientRect();
     if (!stage) return null;
@@ -667,14 +702,14 @@ export default function Instrument() {
       <svg className="hts-defs" aria-hidden width="0" height="0">
         <filter id="hts-glass" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
           <feImage
-            href={GLASS_MAP}
+            href={glassMap}
             x="0" y="0" width="100%" height="100%"
             preserveAspectRatio="none"
             result="map"
           />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-30" xChannelSelector="R" yChannelSelector="G" result="dR" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-23" xChannelSelector="R" yChannelSelector="G" result="dG" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-16" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="56" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="44" xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="32" xChannelSelector="R" yChannelSelector="G" result="dB" />
           <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
           <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
           <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
@@ -971,12 +1006,12 @@ export default function Instrument() {
              chord cards when a chord sounds without a tracked hand ---- */}
         {audioOn && staffPos && (
           <div className="gw-staff-float" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
-            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} />
+            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
         {audioOn && !staffPos && activeSlot !== null && (
           <div className="gw-staff-float gw-staff-anchored">
-            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} />
+            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
 

@@ -178,7 +178,7 @@ export class SynthEngine {
   }
 
   noteOn(voice: number, freq: number): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !Number.isFinite(freq) || freq <= 0) return;
     const v = this.leads[voice];
     if (!v) return;
     v.gate = true;
@@ -192,7 +192,7 @@ export class SynthEngine {
 
   /** Glide the sounding pitch (quantized target or bend) while gated. */
   setFreq(voice: number, freq: number, glide = 0.05): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !Number.isFinite(freq) || freq <= 0) return;
     const v = this.leads[voice];
     if (!v) return;
     v.freq = freq;
@@ -213,6 +213,8 @@ export class SynthEngine {
 
   chordOn(freqs: number[]): void {
     if (!this.ctx) return;
+    freqs = freqs.filter((f) => Number.isFinite(f) && f > 0);
+    if (freqs.length === 0) return;
     this.chordOff();
     this.chordOnFlag = true;
     const ctx = this.ctx;
