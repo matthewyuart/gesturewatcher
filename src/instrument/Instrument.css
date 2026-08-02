@@ -29,6 +29,8 @@
   color: var(--ink);
   opacity: 0.75;
   line-height: 1.6;
+  text-shadow: 0 0 5px var(--halo), 0 0 2px var(--halo);
+  transition: color 0.4s ease;
 }
 
 .gw-micro-right {
@@ -66,9 +68,10 @@
 .gw-scope-dock,
 .gw-hint {
   background: var(--frost);
-  backdrop-filter: blur(28px) saturate(1.05);
-  -webkit-backdrop-filter: blur(28px) saturate(1.05);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(36px) saturate(1.15);
+  -webkit-backdrop-filter: blur(36px) saturate(1.15);
+  border: 1px solid var(--panel-line);
+  transition: background-color 0.4s ease, border-color 0.4s ease;
 }
 
 /* ---- Header ---- */
@@ -126,7 +129,7 @@
 
 .gw-power-on {
   background: var(--ink);
-  color: var(--bg);
+  color: var(--on-ink);
 }
 
 .gw-power-led {
@@ -191,12 +194,13 @@
 .gw-card-live {
   background: var(--ink);
   border-color: var(--ink);
-  color: var(--bg);
+  color: var(--on-ink);
 }
 
 .gw-card-live .gw-card-finger,
 .gw-card-live .gw-card-id {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-ink);
+  opacity: 0.6;
 }
 
 /* ---- Melody ruler — horizontal along the top, left = low ---- */
@@ -245,7 +249,7 @@
   width: 4%;
   font-size: 8.5px;
   color: var(--ink);
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 5px var(--halo), 0 0 2px var(--halo);
 }
 
 .gw-ruler-tick {
@@ -323,7 +327,7 @@
 
 .gw-tab-open {
   background: var(--ink);
-  color: var(--bg);
+  color: var(--on-ink);
 }
 
 /* ---- Sheets ---- */
@@ -337,7 +341,7 @@
   overflow: hidden;
   border-radius: 12px;
   border-width: 0;
-  transition: width 0.22s ease, border-width 0s 0s;
+  transition: width 0.38s cubic-bezier(0.32, 0.72, 0, 1), border-width 0s 0s;
   z-index: 35;
 }
 
@@ -386,7 +390,7 @@
   padding: 7px 10px;
   border-radius: 4px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--control-bg);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -397,11 +401,12 @@
 .gw-active {
   background: var(--ink) !important;
   border-color: var(--ink) !important;
-  color: var(--bg) !important;
+  color: var(--on-ink) !important;
 }
 
 .gw-active .gw-dim {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-ink);
+  opacity: 0.65;
 }
 
 .gw-hot {
@@ -464,7 +469,7 @@
   height: 26px;
   border: 1px solid var(--hairline);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--control-bg);
   cursor: ew-resize;
   touch-action: none;
   overflow: hidden;
@@ -541,13 +546,13 @@
   border: 1px solid var(--hairline);
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--control-bg);
 }
 
 .gw-pkey-w {
   flex: 1;
-  border-right: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.8);
+  border-right: 1px solid rgba(23, 22, 26, 0.2);
+  background: rgba(255, 255, 255, 0.78);
   transition: background 0.08s;
 }
 
@@ -598,6 +603,11 @@
   display: block;
   width: 170px;
   height: 40px;
+}
+
+/* precise press feedback (mouse/trackpad) */
+.gw-root button:active {
+  transform: scale(0.97);
 }
 
 .gw-hint {

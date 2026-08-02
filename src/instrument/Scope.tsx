@@ -25,8 +25,9 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       window.clearTimeout(timer);
       ctx.clearRect(0, 0, W, H);
 
+      const dark = document.body.dataset.tone === 'dark';
       // Graticule
-      ctx.strokeStyle = 'rgba(23, 22, 26, 0.12)';
+      ctx.strokeStyle = dark ? 'rgba(245, 244, 240, 0.15)' : 'rgba(23, 22, 26, 0.12)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, H / 2);
@@ -38,7 +39,7 @@ export function Scope({ engine }: { engine: SynthEngine }) {
       ctx.stroke();
 
       const ok = engine.readWaveform(buf);
-      ctx.strokeStyle = '#17161a';
+      ctx.strokeStyle = dark ? '#f5f4f0' : '#17161a';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
       const n = 512;

@@ -119,7 +119,7 @@ function normAngle(a: number): number {
 }
 
 export default function Instrument() {
-  const { frame, status, source, fps, setSource } = useGestures();
+  const { frame, status, source, fps, setSource, videoEl } = useGestures();
   const engineRef = useRef<SynthEngine | null>(null);
   if (!engineRef.current) engineRef.current = new SynthEngine();
   const engine = engineRef.current;
@@ -141,6 +141,46 @@ export default function Instrument() {
   const [drumPlaying, setDrumPlaying] = useState(false);
   const [genre, setGenre] = useState<GenreId>('citypop');
   const [bpm, setBpm] = useState(GENRES.citypop.bpm);
+  const [tone, setTone] = useState<'bright' | 'dark'>('bright');
+
+  // Adaptive ink: sample the live video's mean luminance and flip between
+  // black ink (bright scene) and white ink (dark scene). Hysteresis keeps
+  // it from flickering at the boundary; <body> gets the tone too so the
+  // canvases (cursor overlay, scope) can read it.
+  useEffect(() => {
+    document.body.dataset.tone = tone;
+  }, [tone]);
+  useEffect(() => {
+    if (source !== 'camera' || !videoEl) {
+      setTone('bright');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 18;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    const sample = () => {
+      if (videoEl.readyState < 2) return;
+      try {
+        ctx.drawImage(videoEl, 0, 0, 32, 18);
+        const d = ctx.getImageData(0, 0, 32, 18).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        }
+        const luma = sum / (d.length / 4) / 255;
+        setTone((prev) =>
+          prev === 'dark' ? (luma > 0.52 ? 'bright' : 'dark') : (luma < 0.4 ? 'dark' : 'bright'),
+        );
+      } catch {
+        // frame not ready — try again next tick
+      }
+    };
+    sample();
+    const id = window.setInterval(sample, 800);
+    return () => window.clearInterval(id);
+  }, [source, videoEl]);
 
   const claimsRef = useRef(new Map<number, Claim>());
   const controlsRef = useRef(new Map<string, HTMLElement>());
@@ -621,7 +661,7 @@ export default function Instrument() {
   });
 
   return (
-    <div className="gw-root" data-testid="instrument">
+    <div className="gw-root" data-testid="instrument" data-tone={tone}>
       {/* ---- Header ---- */}
       <header className="gw-header" ref={registerPanel('header')}>
         <div className="gw-brand">

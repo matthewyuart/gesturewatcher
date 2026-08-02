@@ -1,9 +1,5 @@
 :root {
   --bg: #f2f1ed;
-  --ink: #17161a;
-  --dim: rgba(23, 22, 26, 0.5);
-  --hairline: rgba(23, 22, 26, 0.18);
-  --frost: rgba(255, 255, 255, 0.68);
 
   --sans: 'Inter', 'Avenir Next', system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Consolas, monospace;
@@ -11,8 +7,34 @@
   color-scheme: light;
   font: 14px/1.45 var(--sans);
   background: var(--bg);
-  color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Adaptive ink: black over bright video, white over dark video.
+   The tone is detected from live video luminance and set as
+   data-tone on the instrument root (and <body> for canvases). */
+.gw-root,
+[data-tone='bright'] {
+  --ink: #17161a;
+  --dim: rgba(23, 22, 26, 0.5);
+  --hairline: rgba(23, 22, 26, 0.2);
+  --on-ink: #f2f1ed;
+  --frost: rgba(255, 255, 255, 0.1);
+  --panel-line: rgba(255, 255, 255, 0.55);
+  --control-bg: rgba(255, 255, 255, 0.22);
+  --halo: rgba(255, 255, 255, 0.85);
+}
+
+[data-tone='dark'] {
+  --ink: #f5f4f0;
+  --dim: rgba(245, 244, 240, 0.55);
+  --hairline: rgba(245, 244, 240, 0.25);
+  --on-ink: #17161a;
+  --frost: rgba(16, 16, 20, 0.22);
+  --panel-line: rgba(255, 255, 255, 0.28);
+  --control-bg: rgba(255, 255, 255, 0.09);
+  --halo: rgba(0, 0, 0, 0.65);
 }
 
 * {
@@ -67,10 +89,7 @@ button {
 }
 
 .video-backdrop-tint {
-  position: absolute;
-  inset: 0;
-  background: rgba(242, 241, 237, 0.16);
-  pointer-events: none;
+  display: none;
 }
 
 .hand-overlay {

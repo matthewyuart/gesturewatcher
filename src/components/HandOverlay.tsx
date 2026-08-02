@@ -36,10 +36,16 @@ export function HandOverlay() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
+    // Ink follows the detected video tone (set on <body> by the instrument).
+    const dark = document.body.dataset.tone === 'dark';
+    const ink = dark ? '#f5f4f0' : '#17161a';
+    const inkSoft = dark ? 'rgba(245, 244, 240, 0.25)' : 'rgba(23, 22, 26, 0.2)';
+    const inkFill = dark ? 'rgba(245, 244, 240, 0.85)' : 'rgba(23, 22, 26, 0.85)';
+
     for (const hand of frame.hands) {
       // Skeleton (camera mode only — mouse mode has no landmarks).
       if (hand.landmarks.length === 21) {
-        ctx.strokeStyle = 'rgba(23, 22, 26, 0.18)';
+        ctx.strokeStyle = inkSoft;
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (const [a, b] of CONNECTIONS) {
@@ -47,7 +53,7 @@ export function HandOverlay() {
           ctx.lineTo(hand.landmarks[b].x, hand.landmarks[b].y);
         }
         ctx.stroke();
-        ctx.fillStyle = 'rgba(23, 22, 26, 0.25)';
+        ctx.fillStyle = inkSoft;
         for (const p of hand.landmarks) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
@@ -59,15 +65,15 @@ export function HandOverlay() {
       const { x, y } = hand.cursor;
       const radius = 22 - hand.pinchStrength * 10;
       ctx.lineWidth = 2;
-      ctx.strokeStyle = '#17161a';
+      ctx.strokeStyle = ink;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
       if (hand.pinch) {
-        ctx.fillStyle = 'rgba(23, 22, 26, 0.85)';
+        ctx.fillStyle = inkFill;
         ctx.fill();
       }
-      ctx.fillStyle = '#17161a';
+      ctx.fillStyle = ink;
       ctx.beginPath();
       ctx.arc(x, y, 2.5, 0, Math.PI * 2);
       ctx.fill();
