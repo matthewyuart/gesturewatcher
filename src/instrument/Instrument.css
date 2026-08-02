@@ -98,23 +98,17 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* Edge refraction band: the backdrop is warped + chromatically split by
-   the shared #hts-glass SVG filter, masked to the outer rim only. */
-.hts-pill::after,
-.gw-rail::after,
-.gw-card::after,
-.gw-scope-dock::after,
-.gw-staff-card::after,
-.hts-tutorial::after,
-.gw-sheet-open::after {
-  content: '';
+/* Edge refraction band: backdrop warped + chromatically split by the
+   shared #hts-glass SVG filter, masked to the outer rim only. The
+   backdrop-filter itself is set INLINE by <GlassEdge/> — fragment url()
+   in external CSS resolves against the stylesheet, not the document,
+   and silently breaks in production builds. */
+.hts-glass-edge {
   position: absolute;
   inset: 0;
   z-index: -1; /* behind the panel's own content — warps only the backdrop */
   border-radius: inherit;
   pointer-events: none;
-  backdrop-filter: url(#hts-glass);
-  -webkit-backdrop-filter: url(#hts-glass);
   padding: 9px;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;

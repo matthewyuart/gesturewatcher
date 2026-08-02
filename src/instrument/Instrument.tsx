@@ -71,6 +71,18 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
 const GLASS_MAP =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><defs><linearGradient id='x' x1='0' x2='1' y1='0' y2='0'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%23ff0000'/></linearGradient><linearGradient id='y' x1='0' x2='0' y1='0' y2='1'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%2300ff00'/></linearGradient></defs><rect width='64' height='64' fill='url(%23x)'/><rect width='64' height='64' fill='url(%23y)' style='mix-blend-mode:screen'/></svg>";
 
+/** Edge refraction layer. Inline style so the fragment url resolves against
+ *  the document (external CSS would resolve it against the stylesheet). */
+function GlassEdge() {
+  return (
+    <span
+      className="hts-glass-edge"
+      aria-hidden
+      style={{ backdropFilter: 'url(#hts-glass)', WebkitBackdropFilter: 'url(#hts-glass)' }}
+    />
+  );
+}
+
 const TWIST_FULL = (Math.PI * 3) / 4;
 const BPM_MIN = 60;
 const BPM_MAX = 180;
@@ -682,6 +694,7 @@ export default function Instrument() {
             data-testid="tutorial"
             {...btn('tutorial')}
           >
+            <GlassEdge />
             tutorial
           </button>
           <button
@@ -689,6 +702,7 @@ export default function Instrument() {
             data-testid="power"
             {...btn('power')}
           >
+            <GlassEdge />
             {audioOn ? 'live' : 'on'}
           </button>
         </div>
@@ -715,6 +729,7 @@ export default function Instrument() {
 
         {/* ---- Tab rail ---- */}
         <nav className="gw-rail" ref={registerPanel('rail')}>
+          <GlassEdge />
           {SHEETS.map((s) => (
             <button
               key={s.id}
@@ -729,6 +744,7 @@ export default function Instrument() {
 
         {/* ---- Sheets ---- */}
         <aside className={`gw-sheet ${openSheet ? 'gw-sheet-open' : ''}`} ref={registerPanel('sheet')}>
+          {openSheet && <GlassEdge />}
           {openSheet === 'beat' && (
             <div className="gw-sheet-body" data-testid="sheet-beat">
               <h3 className="gw-sheet-title">beat — seq.16</h3>
@@ -938,6 +954,7 @@ export default function Instrument() {
               data-testid={`card-${k}`}
               {...cardHold(k)}
             >
+              <GlassEdge />
               <span className="gw-card-finger">{FINGER_LABEL[k]}</span>
               <span className="gw-card-name">{chordName(s)}</span>
             </button>
@@ -946,6 +963,7 @@ export default function Instrument() {
 
         {/* ---- Technical scope ---- */}
         <div className="gw-scope-dock" ref={registerPanel('scope')}>
+          <GlassEdge />
           <TechScope engine={engine} />
         </div>
 
@@ -965,6 +983,7 @@ export default function Instrument() {
         {/* ---- Tutorial overlay ---- */}
         {showTutorial && (
           <div className="hts-tutorial" ref={registerPanel('tutorial')} data-testid="tutorial-card">
+            <GlassEdge />
             <h3 className="gw-sheet-title">how to play</h3>
             <p><span className="gw-dim">right hand</span> — pinch to play melody along the top ruler. thumb+index = white keys · thumb+middle = black keys · thumb+ring = slide.</p>
             <p><span className="gw-dim">left hand</span> — thumb+index/middle/ring/pinky holds chords 1–4. the floating staff shows the notes.</p>
