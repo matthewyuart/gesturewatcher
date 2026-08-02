@@ -88,7 +88,7 @@ function makeLensMap(): string {
       const nx = (x / (S - 1)) * 2 - 1;
       const ny = (y / (S - 1)) * 2 - 1;
       const edge = Math.min(1, Math.max(Math.abs(nx), Math.abs(ny)));
-      const fall = edge * edge * edge;
+      const fall = edge * edge * edge * edge;
       const i = (y * S + x) * 4;
       img.data[i] = Math.round(127.5 + nx * fall * 127.5);
       img.data[i + 1] = Math.round(127.5 + ny * fall * 127.5);
@@ -707,9 +707,9 @@ export default function Instrument() {
             preserveAspectRatio="none"
             result="map"
           />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="56" xChannelSelector="R" yChannelSelector="G" result="dR" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="44" xChannelSelector="R" yChannelSelector="G" result="dG" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="32" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-26" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-20" xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-14" xChannelSelector="R" yChannelSelector="G" result="dB" />
           <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
           <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
           <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />

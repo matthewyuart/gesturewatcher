@@ -50,6 +50,7 @@
   height: 100%;
   object-fit: contain; /* native aspect — never crop or zoom the feed */
   transform: scaleX(-1);
+  z-index: 0;
 }
 
 .video-backdrop-fallback {
@@ -58,10 +59,13 @@
   background: #1a1b1e;
 }
 
-/* adaptive darken layer — opacity driven by measured video luminance */
+/* adaptive darken layer — opacity driven by measured video luminance.
+   z-index above the video: the <video> is appended AFTER this div, so
+   without it the live feed paints on top and no shade is visible. */
 .video-shade {
   position: absolute;
   inset: 0;
+  z-index: 2;
   background: #000;
   pointer-events: none;
   transition: opacity 0.7s ease;
