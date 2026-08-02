@@ -1,225 +1,133 @@
 /* ============================================================
-   HTS_01 — hand tracked synth.
-   Micrographic ink on frosted glass over the live feed,
-   white frame around the whole stage.
+   hts_01 — hand tracked synth.
+   Black bezel page, rounded video stage with adaptive shade,
+   lightweight liquid-glass panels, white ink throughout.
    ============================================================ */
 
-.gw-root {
+.hts-page {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  padding: 18px 30px 30px;
+  gap: 12px;
   font-family: var(--mono);
-  color: var(--ink);
   font-size: 12px;
-  /* house style: everything lowercase, nothing bold */
+  color: var(--ink);
   text-transform: lowercase;
   font-weight: 400;
+}
+
+.hts-title {
+  font-family: var(--sans);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  flex: none;
+}
+
+/* ---- Stage: the rounded video area; everything lives inside ---- */
+.hts-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #000;
+}
+
+.video-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.video-backdrop-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* native aspect — never crop or zoom the feed */
+  transform: scaleX(-1);
+}
+
+.video-backdrop-fallback {
+  position: absolute;
+  inset: 0;
+  background: #1a1b1e;
+}
+
+/* adaptive darken layer — opacity driven by measured video luminance */
+.video-shade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
 }
 
 .gw-dim {
   color: var(--dim);
 }
 
-/* Micro annotations */
 .gw-micro {
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  text-transform: lowercase;
   color: var(--ink);
-  opacity: 0.75;
+  opacity: 0.7;
   line-height: 1.6;
-  text-shadow: 0 0 5px var(--halo), 0 0 2px var(--halo);
-  transition: color 0.4s ease;
 }
 
-.gw-micro-right {
-  text-align: right;
-}
-
-/* ---- White frame ---- */
-.gw-frame {
-  position: fixed;
-  inset: 0;
-  border: 14px solid var(--bg);
-  border-radius: 26px;
-  pointer-events: none;
-  z-index: 50;
-}
-
-.gw-frame-cross {
-  position: fixed;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink);
-  z-index: 51;
-  pointer-events: none;
-}
-
-.gw-fc-tl { top: 16px; left: 20px; }
-.gw-fc-br { bottom: 14px; right: 20px; }
-
-/* ---- Frost base ---- */
-.gw-header,
+/* ---- Liquid glass base (lightweight: blur + hairline + specular) ---- */
+.hts-pill,
 .gw-card,
-.gw-mode,
 .gw-rail,
 .gw-sheet,
 .gw-scope-dock,
-.gw-hint {
+.gw-staff-card,
+.hts-tutorial {
   background: var(--frost);
-  backdrop-filter: blur(36px) saturate(1.15);
-  -webkit-backdrop-filter: blur(36px) saturate(1.15);
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
   border: 1px solid var(--panel-line);
-  transition: background-color 0.4s ease, border-color 0.4s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-/* ---- Header ---- */
-.gw-header {
+/* ---- Top-right pills ---- */
+.hts-pills {
   position: absolute;
-  top: 26px;
-  left: 26px;
-  right: 26px;
+  top: 16px;
+  right: 16px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 12px 18px;
-  border-radius: 14px;
-  z-index: 20;
-}
-
-.gw-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.gw-brand-name {
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-}
-
-.gw-brand-sub {
-  font-size: 9px;
-  letter-spacing: 0.26em;
-  color: var(--dim);
-}
-
-.gw-header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.gw-power {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  padding: 9px 18px;
-  border-radius: 4px;
-  border: 1px solid var(--ink);
-  font-family: var(--mono);
+  z-index: 30;
+}
+
+.hts-pill {
+  padding: 8px 16px;
+  border-radius: 99px;
   font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: lowercase;
-  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.1em;
 }
 
-.gw-power-on {
-  background: var(--ink);
-  color: var(--on-ink);
+.hts-pill-sm {
+  border-radius: 99px;
+  font-size: 9px;
 }
 
-.gw-power-led {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1px solid currentColor;
-}
-
-.gw-power-on .gw-power-led {
-  background: currentColor;
-}
-
-/* ---- Chord cards ---- */
-.gw-chords {
-  position: absolute;
-  left: 26px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 20;
-  width: 168px;
-}
-
-.gw-chords > .gw-micro {
-  padding-left: 2px;
-}
-
-.gw-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  text-align: left;
-  transition: background 0.12s, color 0.12s;
-}
-
-.gw-card-finger {
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  color: var(--dim);
-}
-
-.gw-card-name {
-  font-family: var(--sans);
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-
-.gw-card-id {
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: lowercase;
-  color: var(--dim);
-}
-
-.gw-card-live {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--on-ink);
-}
-
-.gw-card-live .gw-card-finger,
-.gw-card-live .gw-card-id {
-  color: var(--on-ink);
-  opacity: 0.6;
-}
-
-/* ---- Melody ruler — horizontal along the top, left = low ---- */
+/* ---- Melody ruler along the top ---- */
 .gw-ruler-wrap {
   position: absolute;
-  top: 116px;
-  left: 12%;
-  right: 12%;
+  top: 22px;
+  left: 9%;
+  right: 24%;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 20;
-}
-
-.gw-mode {
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 9px;
-  letter-spacing: 0.14em;
 }
 
 .gw-ruler {
@@ -230,7 +138,6 @@
   padding-top: 3px;
 }
 
-/* the single horizontal line the ticks hang off */
 .gw-ruler::before {
   content: '';
   position: absolute;
@@ -239,6 +146,7 @@
   top: 0;
   height: 1px;
   background: var(--ink);
+  opacity: 0.9;
 }
 
 .gw-ruler-row {
@@ -249,80 +157,63 @@
   width: 4%;
   font-size: 8.5px;
   color: var(--ink);
-  text-shadow: 0 0 5px var(--halo), 0 0 2px var(--halo);
 }
 
 .gw-ruler-tick {
   width: 1px;
-  height: 8px;
-  background: var(--hairline);
-}
-
-.gw-ruler-root {
-  color: var(--ink);
+  height: 7px;
+  background: var(--ink);
+  opacity: 0.45;
 }
 
 .gw-ruler-root .gw-ruler-tick {
-  height: 15px;
-  background: var(--ink);
+  height: 13px;
+  opacity: 1;
 }
 
 .gw-ruler-off {
-  opacity: 0.32;
+  opacity: 0.35;
 }
 
 .gw-ruler-hit {
-  color: var(--ink);
-  font-weight: 400;
   font-size: 10.5px;
   opacity: 1;
 }
 
 .gw-ruler-hit .gw-ruler-tick {
   width: 3px;
-  height: 20px;
-  background: var(--ink);
+  height: 17px;
+  opacity: 1;
 }
 
 .gw-ruler-caption {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
 }
 
-/* ---- Tab rail ---- */
+/* ---- Tab rail (liquid glass, hugging the right edge) ---- */
 .gw-rail {
   position: absolute;
-  right: 26px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 52px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 6px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 8px 5px;
+  border-radius: 14px;
   z-index: 40;
-}
-
-.gw-rail-micro {
-  writing-mode: vertical-rl;
-  font-size: 7.5px;
-  opacity: 0.5;
 }
 
 .gw-tab {
   writing-mode: vertical-rl;
-  padding: 12px 7px;
-  border-radius: 4px;
+  padding: 14px 8px;
+  border-radius: 9px;
   font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: lowercase;
+  letter-spacing: 0.18em;
   color: var(--dim);
   border: 1px solid transparent;
-  transition: all 0.12s;
+  transition: all 0.15s;
 }
 
 .gw-tab-open {
@@ -333,27 +224,26 @@
 /* ---- Sheets ---- */
 .gw-sheet {
   position: absolute;
-  right: 90px;
-  top: 50%;
-  transform: translateY(-50%);
-  height: calc(100% - 108px);
+  right: 62px;
+  top: 70px;
+  bottom: 118px;
   width: 0;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 16px;
   border-width: 0;
   transition: width 0.38s cubic-bezier(0.32, 0.72, 0, 1), border-width 0s 0s;
   z-index: 35;
 }
 
 .gw-sheet-open {
-  width: 318px;
+  width: 312px;
   border-width: 1px;
 }
 
 .gw-sheet-body {
-  width: 318px;
+  width: 312px;
   height: 100%;
-  padding: 20px 20px 24px;
+  padding: 18px 18px 22px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -362,9 +252,7 @@
 
 .gw-sheet-title {
   font-size: 11px;
-  font-weight: 400;
   letter-spacing: 0.18em;
-  text-transform: lowercase;
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 8px;
 }
@@ -372,7 +260,6 @@
 .gw-sheet-label {
   font-size: 8.5px;
   letter-spacing: 0.16em;
-  text-transform: lowercase;
   color: var(--dim);
   margin-top: 6px;
 }
@@ -388,14 +275,14 @@
 /* ---- Pills / buttons ---- */
 .gw-pill {
   padding: 7px 10px;
-  border-radius: 4px;
+  border-radius: 7px;
   border: 1px solid var(--hairline);
   background: var(--control-bg);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--ink);
-  transition: background 0.1s, color 0.1s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
 .gw-active {
@@ -415,11 +302,10 @@
 
 .gw-play {
   padding: 12px 0;
-  border-radius: 4px;
+  border-radius: 9px;
   border: 1px solid var(--ink);
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 400;
   letter-spacing: 0.22em;
 }
 
@@ -468,7 +354,7 @@
   position: relative;
   height: 26px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: 7px;
   background: var(--control-bg);
   cursor: ew-resize;
   touch-action: none;
@@ -496,7 +382,7 @@
   align-items: center;
   gap: 3px;
   padding: 6px 2px;
-  border-radius: 4px;
+  border-radius: 7px;
   border: 1px solid transparent;
   touch-action: none;
   cursor: ns-resize;
@@ -530,7 +416,6 @@
 .gw-knob-label {
   font-size: 8px;
   letter-spacing: 0.14em;
-  text-transform: lowercase;
 }
 
 .gw-knob-readout {
@@ -542,17 +427,18 @@
 .gw-piano {
   position: relative;
   display: flex;
-  height: 88px;
+  height: 84px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: 7px;
   overflow: hidden;
   background: var(--control-bg);
+  flex: none;
 }
 
 .gw-pkey-w {
   flex: 1;
-  border-right: 1px solid rgba(23, 22, 26, 0.2);
-  background: rgba(255, 255, 255, 0.78);
+  border-right: 1px solid rgba(10, 10, 12, 0.35);
+  background: rgba(255, 255, 255, 0.82);
   transition: background 0.08s;
 }
 
@@ -561,7 +447,7 @@
 }
 
 .gw-pkey-w.gw-pkey-on {
-  background: var(--ink);
+  background: #3b82f6;
 }
 
 .gw-pkey-b {
@@ -569,16 +455,16 @@
   top: 0;
   width: 9%;
   height: 55%;
-  background: var(--ink);
-  border: 1px solid var(--ink);
+  background: #0b0b0d;
+  border: 1px solid #0b0b0d;
   border-radius: 0 0 3px 3px;
   z-index: 2;
   transition: background 0.08s;
 }
 
 .gw-pkey-b.gw-pkey-on {
-  background: var(--bg);
-  box-shadow: inset 0 -6px 0 var(--ink);
+  background: #3b82f6;
+  border-color: #3b82f6;
 }
 
 .gw-piano-range {
@@ -586,79 +472,145 @@
   display: block;
 }
 
-/* ---- Scope + hint ---- */
-.gw-scope-dock {
+/* ---- Chord cards along the bottom ---- */
+.gw-chords {
   position: absolute;
-  left: 26px;
-  bottom: 26px;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 10px;
   z-index: 20;
-  padding: 8px 10px;
-  border-radius: 8px;
+  max-width: calc(100% - 300px);
+  flex-wrap: wrap;
+}
+
+.gw-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 2px;
+  width: 138px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
 }
 
-.gw-scope {
-  display: block;
-  width: 170px;
-  height: 40px;
-}
-
-/* precise press feedback (mouse/trackpad) */
-.gw-root button:active {
-  transform: scale(0.97);
-}
-
-.gw-hint {
-  position: absolute;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 8.5px;
+.gw-card-finger {
+  font-size: 7.5px;
   letter-spacing: 0.14em;
-  color: var(--ink);
-  z-index: 20;
-  white-space: nowrap;
+  color: var(--dim);
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 900px) {
-  .gw-chords {
-    width: 132px;
-  }
-  .gw-card-name {
-    font-size: 14px;
-  }
-  .gw-ruler-wrap {
-    left: 6%;
-    right: 6%;
-  }
-  .gw-ruler-name {
-    font-size: 7px;
-  }
-  .gw-sheet {
-    right: 84px;
-  }
-  .gw-sheet-open,
-  .gw-sheet-body {
-    width: 262px;
-  }
+.gw-card-name {
+  font-family: var(--sans);
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.gw-card-live {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+.gw-card-live .gw-card-finger {
+  color: var(--on-ink);
+  opacity: 0.6;
+}
+
+/* ---- Scope dock ---- */
+.gw-scope-dock {
+  position: absolute;
+  right: 62px;
+  bottom: 16px;
+  z-index: 20;
+  padding: 6px;
+  border-radius: 13px;
+}
+
+/* ---- Floating staff card ---- */
+.gw-staff-float {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 25;
+  pointer-events: none;
+  transition: transform 0.12s linear;
+  will-change: transform;
+}
+
+.gw-staff-card {
+  width: 186px;
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+.gw-staff-anchored {
+  left: 16px;
+  bottom: 96px;
+  top: auto;
+  transform: none;
+}
+
+/* ---- Tutorial overlay ---- */
+.hts-tutorial {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 80%);
+  padding: 20px 22px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 45;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ---- press feedback ---- */
+.hts-page button:active {
+  transform: scale(0.97);
 }
 
 /* ---- Mouse hover (hand-cursor hover uses .gw-hot, camera only) ---- */
 @media (hover: hover) {
   .gw-pill:hover,
   .gw-tab:hover,
-  .gw-power:hover,
   .gw-play:hover,
-  .gw-mode:hover,
   .gw-card:hover,
   .gw-knob:hover,
   .gw-pkey-w:hover,
   .gw-pkey-b:hover {
     border-color: var(--ink);
+  }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 980px) {
+  .gw-ruler-wrap {
+    left: 4%;
+    right: 26%;
+  }
+  .gw-ruler-name {
+    font-size: 7px;
+  }
+  .gw-card {
+    width: 112px;
+  }
+  .gw-card-name {
+    font-size: 13px;
+  }
+  .gw-sheet-open,
+  .gw-sheet-body {
+    width: 258px;
+  }
+  .gw-chords {
+    max-width: calc(100% - 40px);
+  }
+  .gw-scope-dock {
+    display: none;
   }
 }

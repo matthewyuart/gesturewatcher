@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
 
-/** Fullscreen mirrored live camera feed behind the frosted UI. */
-export function VideoBackdrop() {
+/** Live mirrored camera feed filling the stage, with an adaptive shade on
+ *  top so white ink always reads — the parent sets the shade opacity. */
+export function VideoBackdrop({ shade }: { shade: number }) {
   const { videoEl, source } = useGestures();
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -19,7 +20,7 @@ export function VideoBackdrop() {
   return (
     <div className="video-backdrop" ref={hostRef}>
       {(source !== 'camera' || !videoEl) && <div className="video-backdrop-fallback" />}
-      <div className="video-backdrop-tint" />
+      <div className="video-shade" style={{ opacity: shade }} />
     </div>
   );
 }
