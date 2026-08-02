@@ -67,6 +67,10 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   { id: 'blues', label: 'blues', sub: 'i7–iv7–v7–i7', slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')] },
 ];
 
+/** Displacement map for the glass filter: R encodes x, G encodes y. */
+const GLASS_MAP =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><defs><linearGradient id='x' x1='0' x2='1' y1='0' y2='0'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%23ff0000'/></linearGradient><linearGradient id='y' x1='0' x2='0' y1='0' y2='1'><stop offset='0' stop-color='%23000000'/><stop offset='1' stop-color='%2300ff00'/></linearGradient></defs><rect width='64' height='64' fill='url(%23x)'/><rect width='64' height='64' fill='url(%23y)' style='mix-blend-mode:screen'/></svg>";
+
 const TWIST_FULL = (Math.PI * 3) / 4;
 const BPM_MIN = 60;
 const BPM_MAX = 180;
@@ -157,7 +161,7 @@ export default function Instrument() {
           sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
         }
         const luma = sum / (d.length / 4) / 255;
-        const next = Math.min(0.62, Math.max(0.12, 0.1 + luma * 0.62));
+        const next = Math.min(0.74, Math.max(0.3, 0.26 + luma * 0.6));
         setShade((prev) => (Math.abs(prev - next) > 0.03 ? next : prev));
       } catch {
         // frame not ready — try again next tick
@@ -645,6 +649,27 @@ export default function Instrument() {
 
   return (
     <div className="hts-page" data-testid="instrument">
+      {/* Liquid-glass refraction filter: displacement map warps the backdrop
+          at panel edges, split per color channel for chromatic aberration.
+          One shared GPU-composited SVG filter — no per-frame JS. */}
+      <svg className="hts-defs" aria-hidden width="0" height="0">
+        <filter id="hts-glass" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+          <feImage
+            href={GLASS_MAP}
+            x="0" y="0" width="100%" height="100%"
+            preserveAspectRatio="none"
+            result="map"
+          />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-30" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-23" xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="-16" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
+          <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
+          <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
+          <feBlend in="cR" in2="cG" mode="screen" result="rg" />
+          <feBlend in="rg" in2="cB" mode="screen" />
+        </filter>
+      </svg>
       <div className="hts-title">hts_01.</div>
 
       <div className="hts-stage" ref={stageRef}>

@@ -10,9 +10,9 @@
   display: flex;
   flex-direction: column;
   background: var(--page);
-  padding: 18px 30px 30px;
+  padding: 18px 30px 54px; /* extra black bezel along the bottom */
   gap: 12px;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 12px;
   color: var(--ink);
   text-transform: lowercase;
@@ -22,7 +22,6 @@
 .hts-title {
   font-family: var(--sans);
   font-size: 15px;
-  letter-spacing: 0.02em;
   flex: none;
 }
 
@@ -73,9 +72,8 @@
 }
 
 .gw-micro {
-  font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.14em;
+  font-family: var(--sans);
+  font-size: 9px;
   color: var(--ink);
   opacity: 0.7;
   line-height: 1.6;
@@ -89,11 +87,39 @@
 .gw-scope-dock,
 .gw-staff-card,
 .hts-tutorial {
+  position: relative;
+  isolation: isolate;
   background: var(--frost);
-  backdrop-filter: blur(22px) saturate(1.25);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.55) brightness(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.55) brightness(1.08);
   border: 1px solid var(--panel-line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* Edge refraction band: the backdrop is warped + chromatically split by
+   the shared #hts-glass SVG filter, masked to the outer rim only. */
+.hts-pill::after,
+.gw-rail::after,
+.gw-card::after,
+.gw-scope-dock::after,
+.gw-staff-card::after,
+.hts-tutorial::after,
+.gw-sheet-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1; /* behind the panel's own content — warps only the backdrop */
+  border-radius: inherit;
+  pointer-events: none;
+  backdrop-filter: url(#hts-glass);
+  -webkit-backdrop-filter: url(#hts-glass);
+  padding: 9px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 /* ---- Top-right pills ---- */
@@ -109,8 +135,7 @@
 .hts-pill {
   padding: 8px 16px;
   border-radius: 99px;
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-size: 12px;
 }
 
 .hts-pill-sm {
@@ -155,7 +180,7 @@
   align-items: center;
   gap: 5px;
   width: 4%;
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--ink);
 }
 
@@ -209,8 +234,7 @@
   writing-mode: vertical-rl;
   padding: 14px 8px;
   border-radius: 9px;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 11px;
   color: var(--dim);
   border: 1px solid transparent;
   transition: all 0.15s;
@@ -252,21 +276,18 @@
 
 .gw-sheet-title {
   font-size: 11px;
-  letter-spacing: 0.18em;
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 8px;
 }
 
 .gw-sheet-label {
   font-size: 8.5px;
-  letter-spacing: 0.16em;
   color: var(--dim);
   margin-top: 6px;
 }
 
 .gw-sheet-note {
   font-size: 8.5px;
-  letter-spacing: 0.1em;
   line-height: 1.7;
   color: var(--dim);
   margin-top: 6px;
@@ -278,9 +299,8 @@
   border-radius: 7px;
   border: 1px solid var(--hairline);
   background: var(--control-bg);
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
-  letter-spacing: 0.08em;
   color: var(--ink);
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
@@ -304,9 +324,8 @@
   padding: 12px 0;
   border-radius: 9px;
   border: 1px solid var(--ink);
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
-  letter-spacing: 0.22em;
 }
 
 .gw-slot-row,
@@ -415,7 +434,6 @@
 
 .gw-knob-label {
   font-size: 8px;
-  letter-spacing: 0.14em;
 }
 
 .gw-knob-readout {
@@ -497,15 +515,13 @@
 }
 
 .gw-card-finger {
-  font-size: 7.5px;
-  letter-spacing: 0.14em;
+  font-size: 8.5px;
   color: var(--dim);
 }
 
 .gw-card-name {
   font-family: var(--sans);
   font-size: 16px;
-  letter-spacing: -0.01em;
 }
 
 .gw-card-live {

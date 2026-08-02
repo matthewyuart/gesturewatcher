@@ -29,12 +29,12 @@ export function TechScope({ engine }: { engine: SynthEngine }) {
       window.clearTimeout(timer);
 
       // Screen
-      ctx.fillStyle = '#0a0c0a';
+      ctx.fillStyle = '#0b0b0c';
       ctx.fillRect(0, 0, W, H);
 
       // Graticule: 10x6 divisions, brighter center axes.
       ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(120,255,140,0.10)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.09)';
       ctx.beginPath();
       for (let i = 1; i < 10; i++) {
         const x = (i / 10) * W;
@@ -47,7 +47,7 @@ export function TechScope({ engine }: { engine: SynthEngine }) {
         ctx.lineTo(W, y);
       }
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,255,140,0.22)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.20)';
       ctx.beginPath();
       ctx.moveTo(W / 2, 0);
       ctx.lineTo(W / 2, H);
@@ -101,7 +101,7 @@ export function TechScope({ engine }: { engine: SynthEngine }) {
       // Trace.
       const mid = H / 2;
       const n = Math.min(TRACE_SAMPLES, buf.length - trig);
-      ctx.strokeStyle = '#59f07d';
+      ctx.strokeStyle = '#f2f1ee';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
@@ -114,8 +114,8 @@ export function TechScope({ engine }: { engine: SynthEngine }) {
       ctx.stroke();
 
       // Readouts.
-      ctx.fillStyle = 'rgba(200,255,210,0.75)';
-      ctx.font = '8px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      ctx.font = '8px Inter, system-ui, sans-serif';
       ctx.textBaseline = 'top';
       ctx.textAlign = 'left';
       ctx.fillText('ch1 · 100mv/div', 4, 4);
