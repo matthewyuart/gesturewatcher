@@ -63,17 +63,27 @@ its own `border-radius` (base rule in `Instrument.css`).
 active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
 glass and boldens the outline: white border + 1px inset ring — never a fill.
 
-**liquid refraction (warp)**: pills / cards / staff card additionally use
-`backdrop-filter: url(#hts-glass-warp) blur(12px) saturate(1.9)` via the
-`.warp-ok` root class (set when `'chrome' in window`; chromium-only — other
-engines keep the plain blur). the filter is an inline svg in `Instrument.tsx`
-(feTurbulence 0.007 → feGaussianBlur 2.5 → feDisplacementMap scale 77,
-`colorInterpolationFilters="sRGB"` REQUIRED or the whole backdrop shifts).
-applied on the element itself it clips to that element's own radius — this is
-the correct way to get the rdev/liquid-glass-react look. the LIBRARY itself
-was tried at length and removed (`ed25290`…`9f3d1d9`): its inner effect
-layers escape ancestor rounded clipping, always rendering a SQUARE slab under
-rounded outlines — the user rejected that explicitly; do not reinstall it.
+**liquid refraction**: pills / cards / staff float carry a `<GlassFx radius>`
+child (Instrument.tsx) — it measures its parent, bakes per-element
+displacement + specular-rim maps in `src/instrument/liquidGlass.ts` (Snell
+refraction through a convex-squircle bezel, after
+github.com/archisvaze/liquid-glass; ior 1.9, thickness 0.5·minDim, bezel ≈
+radius), renders an svg filter (blur 3 → feImage disp map → feDisplacementMap
+→ saturate 4 → specular rim blends; `colorInterpolationFilters="sRGB"`
+REQUIRED) and sets the parent's inline `backdrop-filter: url(#gfx-N)` — so
+the warp clips to the parent's own radius. chromium-only (`'chrome' in
+window`); other engines keep the css blur glass.
+
+hard-won constraints:
+1. the filter svg is PORTALED to `document.body` — defining it inside the
+   filtered element's own subtree is circular and WEDGES chromium's
+   compositor (page alive, nothing ever paints again).
+2. sizes are measured synchronously at mount with a 500ms retry poll —
+   ResizeObserver callbacks ride the frame loop and never arrive in
+   hidden/throttled tabs (the browser pane), so never rely on RO alone.
+3. `liquid-glass-react` (the npm lib) was tried at length and removed
+   (`ed25290`…`9f3d1d9`): its inner layers escape ancestor rounded clipping —
+   square slab under rounded outlines. do not reinstall it.
 
 ## testing (headless — how all of this was verified)
 
