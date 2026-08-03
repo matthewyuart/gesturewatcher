@@ -64,7 +64,7 @@ export const GLASS_PRESET = {
   mergeRate: 0,
 
   // --- white border highlight ------------------------------------------
-  borderEnabled: false,
+  borderEnabled: true,
   /** css px */
   borderWidth: 3,
   /** 0-100 */

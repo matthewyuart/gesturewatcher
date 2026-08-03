@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
-import { LiquidGlass } from './liquid-glass.js';
+import { LiquidGlass, type GlassShapeRect } from './liquid-glass.js';
 import { GLASS_PRESET } from './glass-preset.js';
 
 /**
@@ -92,9 +92,7 @@ export const GlassCanvas = memo(function GlassCanvas({ shade }: { shade: number 
       const canvasRect = canvas.getBoundingClientRect();
 
       // registered panels -> shapes, in css px relative to the canvas
-      const shapes: {
-        x: number; y: number; width: number; height: number; radius: number;
-      }[] = [];
+      const shapes: GlassShapeRect[] = [];
       for (const [el, radius] of registry) {
         if (!el.isConnected) continue;
         const r = el.getBoundingClientRect();
@@ -105,6 +103,9 @@ export const GlassCanvas = memo(function GlassCanvas({ shade }: { shade: number 
           width: r.width,
           height: r.height,
           radius,
+          // circular corners, matching the DOM border-radius exactly — the
+          // squircle default visibly diverges from the css outline states
+          roundness: 2,
         });
       }
       glass.setShapes(shapes);

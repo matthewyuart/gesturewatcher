@@ -79,8 +79,15 @@ video.
 - **tune in the lab**: `/glass-lab/` (standalone vite page) → dial controls →
   "copy config for main app" → paste over `src/instrument/glass-preset.js`.
 - `blurRadius` 1 = clear reference glass; 20–40 if text legibility suffers.
-  `refDispersion` 7 subtle, 20+ rainbow fringing. `mergeRate > 0` = nearby
-  shapes fuse like mercury.
+  `refDispersion` 7 subtle, 20+ rainbow fringing. `mergeRate` stays **0** —
+  the user explicitly rejected shapes fusing. `borderEnabled` stays **true**:
+  the white ring is drawn by the shader (one flattened layer, exact SDF fit);
+  resting `gw-lg` DOM has NO border/bg/shadow of its own. the wrapper passes
+  `roundness: 2` per shape so glass corners exactly match the css
+  border-radius of the hover ring / active outline (squircle 5 visibly
+  diverges). `mirror: true` in the wrapper — the dom video is scaleX(-1).
+- `.gw-staff-float` must NOT have a transform transition — the canvas reads
+  its rect per frame and a css tween makes glass and dom shear apart.
 - glass visual checks headlessly: `window.__glassPattern(true)` substitutes a
   stripe texture for the camera, then screenshot.
 - the wrapper's try/catch stays — glass must never unmount the app; the
