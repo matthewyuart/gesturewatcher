@@ -97,15 +97,17 @@ export const GlassCanvas = memo(function GlassCanvas({ shade }: { shade: number 
         if (!el.isConnected) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) continue;
+        // the white ring is shader-drawn, per shape: full on activation,
+        // half on hover — resting shapes carry no border at all
+        const active = el.classList.contains('gw-card-live') || el.classList.contains('gw-active');
+        const hot = el.classList.contains('gw-hot') || el.matches(':hover');
         shapes.push({
           x: r.left - canvasRect.left,
           y: r.top - canvasRect.top,
           width: r.width,
           height: r.height,
           radius,
-          // circular corners, matching the DOM border-radius exactly — the
-          // squircle default visibly diverges from the css outline states
-          roundness: 2,
+          border: active ? 1 : hot ? 0.5 : 0,
         });
       }
       glass.setShapes(shapes);

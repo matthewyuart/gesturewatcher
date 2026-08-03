@@ -46,6 +46,8 @@ export interface GlassShapeRect {
   radius?: number;
   /** overrides preset.shapeRoundness for this shape */
   roundness?: number;
+  /** 0..1 weight for the white border highlight on this shape; default 0 */
+  border?: number;
 }
 
 export interface GlassSourceRect {

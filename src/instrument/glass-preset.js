@@ -64,6 +64,11 @@ export const GLASS_PRESET = {
   mergeRate: 0,
 
   // --- white border highlight ------------------------------------------
+  /**
+   * Gates the border FEATURE; visibility is per shape — the wrapper passes
+   * border weight 1 for activated elements, 0.5 on hover, 0 at rest, so
+   * resting glass shows no ring even with this true.
+   */
   borderEnabled: true,
   /** css px */
   borderWidth: 3,

@@ -80,12 +80,15 @@ video.
   "copy config for main app" → paste over `src/instrument/glass-preset.js`.
 - `blurRadius` 1 = clear reference glass; 20–40 if text legibility suffers.
   `refDispersion` 7 subtle, 20+ rainbow fringing. `mergeRate` stays **0** —
-  the user explicitly rejected shapes fusing. `borderEnabled` stays **true**:
-  the white ring is drawn by the shader (one flattened layer, exact SDF fit);
-  resting `gw-lg` DOM has NO border/bg/shadow of its own. the wrapper passes
-  `roundness: 2` per shape so glass corners exactly match the css
-  border-radius of the hover ring / active outline (squircle 5 visibly
-  diverges). `mirror: true` in the wrapper — the dom video is scaleX(-1).
+  the user explicitly rejected shapes fusing. `mirror: true` in the wrapper —
+  the dom video is scaleX(-1).
+- **rings are shader-drawn and per shape** (renderer extension: `border`
+  0..1 on each shape → `u_shapeParams[i].z`, weighted by nearest-shape in
+  `borderWeightAt`). the wrapper maps element state each frame: `gw-card-live`
+  / `gw-active` → 1, `gw-hot` / `:hover` → 0.5, resting → 0. `borderEnabled`
+  in the preset gates the feature and must stay true. `gw-lg` DOM draws NO
+  border/bg/shadow in ANY state (css forces transparent) — one flattened
+  layer, exact SDF fit, squircle corners (preset roundness 5) preserved.
 - `.gw-staff-float` must NOT have a transform transition — the canvas reads
   its rect per frame and a css tween makes glass and dom shear apart.
 - glass visual checks headlessly: `window.__glassPattern(true)` substitutes a

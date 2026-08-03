@@ -41,7 +41,7 @@ uniform vec2 u_resolution;
 uniform float u_dpr;
 uniform int u_shapeCount;
 uniform vec4 u_shapeRects[${MAX_SHAPES}];
-uniform vec2 u_shapeParams[${MAX_SHAPES}]; // x = corner radius (device px), y = roundness
+uniform vec3 u_shapeParams[${MAX_SHAPES}]; // x = corner radius (device px), y = roundness, z = border weight 0..1
 uniform float u_mergeRate;
 
 float superellipseCornerSDF(vec2 p, float r, float n) {
@@ -80,6 +80,22 @@ float sdfAt(vec2 p, vec2 offset) {
 
 float mainSDF(vec2 p) {
   return sdfAt(p, vec2(0.0));
+}
+
+// border weight of the nearest shape (per-shape activation rings)
+float borderWeightAt(vec2 p) {
+  float d = 1e9;
+  float b = 0.0;
+  for (int i = 0; i < ${MAX_SHAPES}; i++) {
+    if (i >= u_shapeCount) break;
+    vec4 r = u_shapeRects[i];
+    float di = rectSDF(p - r.xy, r.zw, u_shapeParams[i].x, u_shapeParams[i].y);
+    if (di < d) {
+      d = di;
+      b = u_shapeParams[i].z;
+    }
+  }
+  return b;
 }`;
 
 // ---- pass 1: backdrop ----
@@ -295,12 +311,15 @@ void main() {
     }
   }
 
-  // white border highlight hugging the rim
+  // white border highlight hugging the rim, weighted per shape (activation)
   if (u_borderFactor > 0.0) {
-    float dCss = merged * res1x.y;
-    float band = abs(dCss + u_borderWidth * 0.5) - u_borderWidth * 0.5;
-    float mask = 1.0 - smoothstep(-0.75, 0.75, band);
-    outColor = mix(outColor, vec4(1.0), mask * u_borderFactor);
+    float bw = borderWeightAt(gl_FragCoord.xy);
+    if (bw > 0.0) {
+      float dCss = merged * res1x.y;
+      float band = abs(dCss + u_borderWidth * 0.5) - u_borderWidth * 0.5;
+      float mask = 1.0 - smoothstep(-0.75, 0.75, band);
+      outColor = mix(outColor, vec4(1.0), mask * u_borderFactor * bw);
+    }
   }
 
   // straight-alpha output: opaque over the shape, shadow outside, clear beyond
@@ -544,13 +563,13 @@ export class LiquidGlass {
     // shapes -> uniform arrays (device px, y-up)
     const count = this.shapes.length;
     const rects = new Float32Array(MAX_SHAPES * 4);
-    const sparams = new Float32Array(MAX_SHAPES * 2);
+    const sparams = new Float32Array(MAX_SHAPES * 3);
     for (let i = 0; i < count; i++) {
       const s = this.shapes[i];
       const cx = (s.x + s.width / 2) * dpr;
       const cy = H - (s.y + s.height / 2) * dpr;
       rects.set([cx, cy, (s.width / 2) * dpr, (s.height / 2) * dpr], i * 4);
-      sparams.set([(s.radius ?? 12) * dpr, s.roundness ?? p.shapeRoundness ?? 5], i * 2);
+      sparams.set([(s.radius ?? 12) * dpr, s.roundness ?? p.shapeRoundness ?? 5, s.border ?? 0], i * 3);
     }
 
     const setShapeUniforms = (prog) => {
@@ -558,7 +577,7 @@ export class LiquidGlass {
       gl.uniform1f(prog.u.u_dpr, dpr);
       gl.uniform1i(prog.u.u_shapeCount, count);
       gl.uniform4fv(prog.u.u_shapeRects, rects);
-      gl.uniform2fv(prog.u.u_shapeParams, sparams);
+      gl.uniform3fv(prog.u.u_shapeParams, sparams);
       gl.uniform1f(prog.u.u_mergeRate, p.mergeRate ?? 0);
     };
 

@@ -108,9 +108,13 @@
   box-shadow: none !important;
 }
 
-.gw-lg.gw-card-live {
-  border-color: var(--ink) !important;
-  box-shadow: inset 0 0 0 1px var(--ink) !important;
+/* activation + hover rings come from the shader (GlassCanvas passes a
+   per-shape border weight) — the DOM never draws its own ring here */
+.gw-lg.gw-card-live,
+.gw-lg.gw-hot,
+.gw-lg:hover {
+  border-color: transparent !important;
+  box-shadow: none !important;
   color: var(--ink) !important;
 }
 
