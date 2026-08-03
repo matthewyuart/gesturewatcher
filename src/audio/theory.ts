@@ -61,12 +61,82 @@ const FLAT_NAMES = [
   'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B',
 ] as const;
 
+/** Black-key pitch classes read as flats (Bb, Eb…), matching the staff. */
+function pcName(pc: number): string {
+  return [1, 3, 6, 8, 10].includes(pc) ? FLAT_NAMES[pc] : NOTE_NAMES[pc];
+}
+
+/**
+ * Chord templates for recognition, matched as exact pitch-class sets above a
+ * candidate root. Order = preference on ties (C6 over Am7/c, etc.).
+ * Recognition approach after derrickward/ChordRecGen: try every present pitch
+ * class as the root, score the exact template matches, prefer root-in-bass
+ * readings, and name inversions as slash chords.
+ */
+const CHORD_TEMPLATES: Array<{ label: string; pcs: number[] }> = [
+  { label: 'maj', pcs: [0, 4, 7] },
+  { label: 'min', pcs: [0, 3, 7] },
+  { label: '7', pcs: [0, 4, 7, 10] },
+  { label: 'maj7', pcs: [0, 4, 7, 11] },
+  { label: 'min7', pcs: [0, 3, 7, 10] },
+  { label: 'sus4', pcs: [0, 5, 7] },
+  { label: 'sus2', pcs: [0, 2, 7] },
+  { label: 'dim', pcs: [0, 3, 6] },
+  { label: 'aug', pcs: [0, 4, 8] },
+  { label: '6', pcs: [0, 4, 7, 9] },
+  { label: 'min6', pcs: [0, 3, 7, 9] },
+  { label: 'add9', pcs: [0, 2, 4, 7] },
+  { label: 'minadd9', pcs: [0, 2, 3, 7] },
+  { label: 'dim7', pcs: [0, 3, 6, 9] },
+  { label: 'min7b5', pcs: [0, 3, 6, 10] },
+  { label: 'minmaj7', pcs: [0, 3, 7, 11] },
+  { label: '7sus4', pcs: [0, 5, 7, 10] },
+  { label: 'aug7', pcs: [0, 4, 8, 10] },
+  { label: '9', pcs: [0, 2, 4, 7, 10] },
+  { label: 'maj9', pcs: [0, 2, 4, 7, 11] },
+  { label: 'min9', pcs: [0, 2, 3, 7, 10] },
+  { label: '7b9', pcs: [0, 1, 4, 7, 10] },
+  { label: '7#9', pcs: [0, 3, 4, 7, 10] },
+  { label: '11', pcs: [0, 2, 4, 5, 7, 10] },
+  { label: '13', pcs: [0, 2, 4, 7, 9, 10] },
+  { label: '5', pcs: [0, 7] },
+];
+
+export interface RecognizedChord {
+  root: number; // 0..11
+  name: string;
+}
+
+/** Recognize a chord from the exact notes played (null if nothing matches). */
+export function recognizeChord(notes: number[]): RecognizedChord | null {
+  if (notes.length === 0) return null;
+  const sorted = [...notes].sort((a, b) => a - b);
+  const bass = ((sorted[0] % 12) + 12) % 12;
+  const pcs = [...new Set(sorted.map((n) => ((n % 12) + 12) % 12))];
+  if (pcs.length === 1) return { root: bass, name: pcName(bass) };
+
+  let best: RecognizedChord | null = null;
+  let bestScore = -1;
+  for (const root of pcs) {
+    const rel = new Set(pcs.map((p) => (((p - root) % 12) + 12) % 12));
+    for (let t = 0; t < CHORD_TEMPLATES.length; t++) {
+      const tpl = CHORD_TEMPLATES[t];
+      if (tpl.pcs.length !== rel.size || !tpl.pcs.every((iv) => rel.has(iv))) continue;
+      const score = (root === bass ? 100 : 0) + (CHORD_TEMPLATES.length - t);
+      if (score > bestScore) {
+        bestScore = score;
+        const slash = root === bass ? '' : `/${pcName(bass)}`;
+        best = { root, name: `${pcName(root)}${tpl.label}${slash}` };
+      }
+    }
+  }
+  return best;
+}
+
 export function chordName(slot: ChordSlot): string {
-  // Black-key roots read as flats (Bb, Eb…), matching the staff spelling.
-  const name = [1, 3, 6, 8, 10].includes(slot.root)
-    ? FLAT_NAMES[slot.root]
-    : NOTE_NAMES[slot.root];
-  return `${name}${quality(slot.quality).label}`;
+  // Name what the voicing actually plays; fall back to the stored
+  // root+quality when the notes don't spell a known chord.
+  return recognizeChord(slot.notes)?.name ?? `${pcName(slot.root)}${quality(slot.quality).label}`;
 }
 
 /** Default voicing for a root+quality, used until the user edits notes. */

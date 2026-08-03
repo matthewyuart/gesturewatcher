@@ -12,6 +12,7 @@ import {
   midiToFreq,
   NOTE_NAMES,
   quality,
+  recognizeChord,
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
@@ -638,8 +639,10 @@ export default function Instrument() {
 
   // Floating staff card follows the left (chord) hand.
   const staffSlot = chordSlots[activeSlot ?? lastSlot];
-  // Flat-side roots (F, Bb, Eb, Ab, Db, Gb) spell black keys as flats.
-  const staffFlats = [5, 10, 3, 8, 1, 6].includes(staffSlot.root);
+  // Flat-side roots (F, Bb, Eb, Ab, Db, Gb) spell black keys as flats —
+  // judged from the recognized root of the actual voicing.
+  const staffRoot = recognizeChord(staffSlot.notes)?.root ?? staffSlot.root;
+  const staffFlats = [5, 10, 3, 8, 1, 6].includes(staffRoot);
   const stageRectRef = useRef<{ t: number; r: DOMRect | null }>({ t: 0, r: null });
   const staffPos = useMemo(() => {
     const leftHand = frame.hands.find((h) => h.handedness === 'Left' && h.landmarks.length === 21);
@@ -713,6 +716,14 @@ export default function Instrument() {
         {/* ---- Top-right pills ---- */}
         <div className="hts-pills" ref={registerPanel('pills')}>
           <button
+            className={`gw-pill hts-pill hts-libglass ${melodyMode === 'auto' ? 'gw-active' : ''} ${hotControls.has('mode') ? 'gw-hot' : ''}`}
+            data-testid="mode-toggle"
+            {...btn('mode')}
+          >
+            <GlassSkin radius={17} />
+            {melodyMode === 'auto' ? `auto · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}` : 'free · chromatic'}
+          </button>
+          <button
             className={`gw-pill hts-pill hts-libglass ${showTutorial ? 'gw-active' : ''} ${hotControls.has('tutorial') ? 'gw-hot' : ''}`}
             data-testid="tutorial"
             {...btn('tutorial')}
@@ -742,11 +753,6 @@ export default function Instrument() {
                 <span className="gw-ruler-name">{row.name}</span>
               </div>
             ))}
-          </div>
-          <div className="gw-ruler-caption">
-            <button className={`gw-pill hts-pill-sm ${hotControls.has('mode') ? 'gw-hot' : ''}`} data-testid="mode-toggle" {...btn('mode')}>
-              {melodyMode === 'auto' ? `auto · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}` : 'free · chromatic'}
-            </button>
           </div>
         </div>
 

@@ -136,27 +136,24 @@
   display: none;
 }
 
-/* elements skinned by the library drop their own CSS glass */
+/* elements skinned by the library drop their own CSS glass but keep a
+   subtle hairline outline so their rounded edges always read */
 .hts-libglass {
   background: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border-color: transparent !important;
+  border-color: var(--panel-line) !important;
   box-shadow: none !important;
 }
 
-/* active = just a white outline: no fill, and the liquid-glass skin is
-   hidden outright (its warp layers otherwise show through as a slab) */
+/* active = the same glass with a bolder white outline — never a fill,
+   and the liquid-glass skin stays visible */
 .hts-libglass.gw-active,
 .hts-libglass.gw-card-live {
   background: none !important;
   border-color: var(--ink) !important;
+  box-shadow: inset 0 0 0 1px var(--ink) !important;
   color: var(--ink) !important;
-}
-
-.hts-libglass.gw-active .hts-skin,
-.hts-libglass.gw-card-live .hts-skin {
-  display: none;
 }
 
 .hts-libglass.gw-card-live .gw-card-finger {
@@ -193,17 +190,13 @@
   font-size: 12px;
 }
 
-.hts-pill-sm {
-  border-radius: 99px;
-  font-size: 9px;
-}
-
 /* ---- Melody ruler along the top ---- */
 .gw-ruler-wrap {
   position: absolute;
   top: 22px;
-  left: 9%;
-  right: 24%;
+  left: 6%;
+  /* clears the three top-right pills (mode · tutorial · power) */
+  right: 32%;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -266,11 +259,6 @@
   opacity: 1;
 }
 
-.gw-ruler-caption {
-  display: flex;
-  justify-content: flex-end;
-}
-
 /* ---- Tab rail (liquid glass, hugging the right edge) ---- */
 .gw-rail {
   position: absolute;
@@ -305,7 +293,8 @@
   position: absolute;
   right: 62px;
   top: 70px;
-  bottom: 118px;
+  /* stop above the scope dock (bottom 16 + ~134 tall + gap) */
+  bottom: 162px;
   width: 0;
   overflow: hidden;
   border-radius: 16px;
@@ -663,7 +652,7 @@
 @media (max-width: 980px) {
   .gw-ruler-wrap {
     left: 4%;
-    right: 26%;
+    right: 34%;
   }
   .gw-ruler-name {
     font-size: 7px;

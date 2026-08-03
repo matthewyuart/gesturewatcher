@@ -31,7 +31,7 @@ browser; no backend, no samples.
 
 - `src/audio/SynthEngine.ts` — 2 lead voices (dual detuned osc, envelope-gated, melody uses voice 0) + poly chord pad → shared lowpass → feedback delay → limiter → analyser. **rejects non-finite frequencies** (guard against NaN from degenerate layout rects — removing this once caused a full react unmount crash).
 - `src/audio/DrumMachine.ts` — 8-bit kit (square kick w/ pitch drop, noise snare/hats) + square **synth bass following the sounding chord root** (set via `setBassRoot`). 16-step patterns: city pop (default, 102bpm) / lofi / bossa / samba / hiphop / pop / house, per-genre swing. lookahead scheduler vs the audio clock: 0.3s horizon visible, 1.5s hidden; `stop()` hard-kills all scheduled sources (tracked in a set) so stop is instant and restarts don't layer.
-- `src/audio/theory.ts` — chord qualities (maj/min/dom7/maj7/min7/sus4/dim/add9) with chord→scale pairings; `ChordSlot` carries an explicit `notes: number[]` voicing (editable per-note on the 2-octave piano in the chords sheet, c3–c5); flat-rooted chords (f/bb/eb/ab/db/gb) spell + name as flats (`Bbmaj7`, ♭ on the staff).
+- `src/audio/theory.ts` — chord qualities (maj/min/dom7/maj7/min7/sus4/dim/add9) with chord→scale pairings; `ChordSlot` carries an explicit `notes: number[]` voicing (editable per-note on the 2-octave piano in the chords sheet, c3–c5); flat-rooted chords (f/bb/eb/ab/db/gb) spell + name as flats (`Bbmaj7`, ♭ on the staff). **`recognizeChord(notes)`** (after derrickward/ChordRecGen) names slots from the actual voicing — exact pitch-class-set match over ~26 templates, every present pc tried as root, root-in-bass preferred, inversions named as slash chords (`Cmaj/E`); `chordName` falls back to stored root+quality only when nothing matches. staff flat-spelling follows the recognized root. auto-mode scale + bass root still use the stored `root`/`quality` (recognition is display-only).
 - progressions presets (chords sheet): city pop royal road (default: fmaj7·g7·em7·am7), pop, 50s, jazz, andalusian, blues.
 
 ## gesture engine
@@ -48,7 +48,7 @@ camera pinch — same bar pattern as bpm). the old auto-luminance sampler was
 removed. `.video-shade` must keep `z-index` above the video (video is
 appended after it in the dom).
 
-- top ruler = melody; `tutorial` + `on` pills top-right; tabs `beat/chords/tone` right edge; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
+- top ruler = melody (inset `right: 32%` to clear the pills); `auto/free` mode + `tutorial` + `on` pills top-right (all liquid glass); tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
 - typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
 - hand cursor overlay: always **white outlines** + dark halo; pinch = thicker outline ring, **never filled**.
 - central interaction: controls register dom nodes in `controlsRef` (per-id cached ref callbacks); camera pinches hit-test those rects; claims (`claimsRef`) route knob/bpm/chord-card drags per hand. hover glow (`gw-hot`) computed only in camera mode against 400ms-cached rects; mouse uses css `:hover`.
@@ -68,7 +68,7 @@ the library assumes its demo environment; all of these are REQUIRED:
 4. `key={size}` remount on settled size — the lib only re-measures on window resize.
 5. static `globalMousePos`/`mouseOffset` props — disables its per-instance mousemove listeners (perf).
 6. `.hts-skin { border-radius: inherit; overflow: hidden }` — restores rounded corners (the lib's radius doesn't clip its warp layers).
-7. `.hts-libglass` strips our css glass under skins; `gw-active`/`gw-card-live` on skinned elements render as a **white outline** (border + 1px inset shadow, transparent body) — never a solid fill.
+7. `.hts-libglass` strips our css glass under skins but keeps a subtle `--panel-line` hairline; `gw-active`/`gw-card-live` **bolden the outline** (white border + 1px inset ring, transparent body, glass stays visible) — never a solid fill.
 8. `GlassSkin` is memoized — without it every skin re-renders `LiquidGlass` on every gesture frame.
 
 ## testing (headless — how all of this was verified)
