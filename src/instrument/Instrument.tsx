@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
-import { createPortal } from 'react-dom';
 import { useGestures } from '../gesture/GestureProvider';
 import { useHandEvents } from '../gesture/useHandEvents';
 import type { Point } from '../gesture/types';
@@ -17,7 +16,7 @@ import {
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
-import { buildGlassMaps, type GlassMaps } from './liquidGlass';
+import { GlassCanvas, GlassShape } from './GlassCanvas';
 import { Knob } from './Knob';
 import { TechScope } from './TechScope';
 import { StaffChord } from './StaffChord';
@@ -71,94 +70,6 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   { id: 'andalusian', label: 'andalusian', sub: 'i–bvii–bvi–v7', slots: [slot(9, 'min'), slot(7, 'maj'), slot(5, 'maj'), slot(4, 'dom7')] },
   { id: 'blues', label: 'blues', sub: 'i7–iv7–v7–i7', slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')] },
 ];
-
-let glassSeq = 0;
-
-/**
- * Liquid-glass refraction on the PARENT element: measures it, bakes the
- * displacement/specular maps (see liquidGlass.ts), renders a per-instance
- * SVG filter and points the parent's own backdrop-filter at it — the warp
- * clips to the parent's border-radius, no extra visible layers.
- * Chromium-only; elsewhere the css blur glass stays as-is.
- */
-const GlassFx = memo(function GlassFx({ radius }: { radius: number }) {
-  const hostRef = useRef<HTMLSpanElement>(null);
-  const idRef = useRef('');
-  if (!idRef.current) idRef.current = `gfx-${glassSeq++}`;
-  const [maps, setMaps] = useState<GlassMaps | null>(null);
-
-  useEffect(() => {
-    if (!('chrome' in window)) return;
-    const host = hostRef.current?.parentElement;
-    if (!host) return;
-    const apply = (w: number, h: number) => {
-      if (w < 8 || h < 8) return false;
-      setMaps((prev) => (prev && prev.w === w && prev.h === h ? prev : buildGlassMaps(w, h, radius)));
-      return true;
-    };
-    // Measure synchronously at mount; ResizeObserver callbacks ride the frame
-    // loop and never arrive in hidden/throttled tabs, so poll until layout
-    // exists (real browsers succeed on the first try).
-    let poll = 0;
-    if (!apply(host.offsetWidth, host.offsetHeight)) {
-      poll = window.setInterval(() => {
-        if (apply(host.offsetWidth, host.offsetHeight)) window.clearInterval(poll);
-      }, 500);
-    }
-    // Track later size changes (e.g. the mode pill relabeling).
-    const ro = new ResizeObserver((entries) => {
-      const box = entries[entries.length - 1]?.borderBoxSize?.[0];
-      apply(
-        Math.round(box ? box.inlineSize : host.offsetWidth),
-        Math.round(box ? box.blockSize : host.offsetHeight),
-      );
-    });
-    ro.observe(host);
-    return () => {
-      window.clearInterval(poll);
-      ro.disconnect();
-    };
-  }, [radius]);
-
-  useEffect(() => {
-    const host = hostRef.current?.parentElement;
-    if (!host || !maps) return;
-    const filter = `url(#${idRef.current})`;
-    host.style.backdropFilter = filter;
-    host.style.setProperty('-webkit-backdrop-filter', filter);
-    return () => {
-      host.style.backdropFilter = '';
-      host.style.removeProperty('-webkit-backdrop-filter');
-    };
-  }, [maps]);
-
-  return (
-    <span ref={hostRef} className="gw-fx" aria-hidden>
-      {maps &&
-        // The filter MUST live outside the element whose backdrop-filter
-        // references it — defining it in the filtered element's own subtree
-        // is circular and wedges chromium's compositor.
-        createPortal(
-          <svg width={0} height={0} style={{ position: 'absolute' }}>
-            <filter id={idRef.current} x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
-              <feGaussianBlur in="SourceGraphic" stdDeviation={3} result="blur" />
-              <feImage href={maps.disp} x={0} y={0} width={maps.w} height={maps.h} result="map" />
-              <feDisplacementMap in="blur" in2="map" scale={maps.scale} xChannelSelector="R" yChannelSelector="G" result="ref" />
-              <feColorMatrix in="ref" type="saturate" values="4" result="sat" />
-              <feImage href={maps.spec} x={0} y={0} width={maps.w} height={maps.h} result="rim" />
-              <feComposite in="sat" in2="rim" operator="in" result="satrim" />
-              <feComponentTransfer in="rim" result="gleam">
-                <feFuncA type="linear" slope={0.5} />
-              </feComponentTransfer>
-              <feBlend in="satrim" in2="ref" mode="normal" result="glass" />
-              <feBlend in="gleam" in2="glass" mode="normal" />
-            </filter>
-          </svg>,
-          document.body,
-        )}
-    </span>
-  );
-});
 
 // Memoized presentational components — skip re-render on unrelated frames.
 const MKnob = memo(Knob);
@@ -754,7 +665,6 @@ export default function Instrument() {
             data-testid="mode-toggle"
             {...btn('mode')}
           >
-            <GlassFx radius={99} />
             {melodyMode === 'auto' ? `auto · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}` : 'free · chromatic'}
           </button>
           <button
@@ -762,7 +672,6 @@ export default function Instrument() {
             data-testid="tutorial"
             {...btn('tutorial')}
           >
-            <GlassFx radius={99} />
             tutorial
           </button>
           <button
@@ -770,7 +679,6 @@ export default function Instrument() {
             data-testid="power"
             {...btn('power')}
           >
-            <GlassFx radius={99} />
             {audioOn ? 'live' : 'on'}
           </button>
         </div>
@@ -778,6 +686,7 @@ export default function Instrument() {
 
       <div className="hts-stage" ref={stageRef}>
         <VideoBackdrop shade={shade} />
+        <GlassCanvas shade={shade} />
 
         {/* ---- Melody ruler along the top, right-aligned ---- */}
         <div className="gw-ruler-wrap">
@@ -1022,12 +931,12 @@ export default function Instrument() {
           {chordSlots.map((s, k) => (
             <button
               key={k}
-              className={`gw-card ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
+              className={`gw-card gw-lg ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
               ref={registerControl(`card:${k}`) as unknown as Ref<HTMLButtonElement>}
               data-testid={`card-${k}`}
               {...cardHold(k)}
             >
-              <GlassFx radius={12} />
+              <GlassShape radius={12} />
               <span className="gw-card-finger">{FINGER_LABEL[k]}</span>
               <span className="gw-card-name">{chordName(s)}</span>
             </button>
@@ -1042,14 +951,14 @@ export default function Instrument() {
         {/* ---- Floating staff: follows the left hand; anchors above the
              chord cards when a chord sounds without a tracked hand ---- */}
         {audioOn && staffPos && (
-          <div className="gw-staff-float" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
-            <GlassFx radius={12} />
+          <div className="gw-staff-float gw-lg" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
+            <GlassShape radius={12} />
             <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
         {audioOn && !staffPos && activeSlot !== null && (
-          <div className="gw-staff-float gw-staff-anchored">
-            <GlassFx radius={12} />
+          <div className="gw-staff-float gw-staff-anchored gw-lg">
+            <GlassShape radius={12} />
             <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}

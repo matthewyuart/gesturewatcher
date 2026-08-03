@@ -63,27 +63,32 @@ its own `border-radius` (base rule in `Instrument.css`).
 active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
 glass and boldens the outline: white border + 1px inset ring — never a fill.
 
-**liquid refraction**: pills / cards / staff float carry a `<GlassFx radius>`
-child (Instrument.tsx) — it measures its parent, bakes per-element
-displacement + specular-rim maps in `src/instrument/liquidGlass.ts` (Snell
-refraction through a convex-squircle bezel, after
-github.com/archisvaze/liquid-glass; ior 1.9, thickness 0.5·minDim, bezel ≈
-radius), renders an svg filter (blur 3 → feImage disp map → feDisplacementMap
-→ saturate 4 → specular rim blends; `colorInterpolationFilters="sRGB"`
-REQUIRED) and sets the parent's inline `backdrop-filter: url(#gfx-N)` — so
-the warp clips to the parent's own radius. chromium-only (`'chrome' in
-window`); other engines keep the css blur glass.
+**liquid refraction** (`src/instrument/GlassCanvas.tsx`): ONE WebGL2 canvas
+overlays the stage (`.gw-glass-canvas`, z 3 — above video+shade, below all
+panels) and each frame draws every registered glass shape, sampling the live
+camera texture (mirrored, letterbox-mapped, shade-multiplied, mipmapped for
+the frost lod). shader math ported from **iyinchao/liquid-glass-studio**
+(MIT): rounded-rect SDF → lens-model edge refraction (thickness 16, ior 1.4)
+→ per-channel chromatic dispersion (7) → fresnel rim → angle-lit glare.
+chord cards + staff float opt in via a `<GlassShape radius>` child + `gw-lg`
+class (strips the css glass body; DOM keeps outline/text/lift). pills keep
+css glass (they sit on the black bezel — nothing to refract). works in every
+browser (no backdrop-filter); ~120fps.
 
 hard-won constraints:
-1. the filter svg is PORTALED to `document.body` — defining it inside the
-   filtered element's own subtree is circular and WEDGES chromium's
-   compositor (page alive, nothing ever paints again).
-2. sizes are measured synchronously at mount with a 500ms retry poll —
-   ResizeObserver callbacks ride the frame loop and never arrive in
-   hidden/throttled tabs (the browser pane), so never rely on RO alone.
-3. `liquid-glass-react` (the npm lib) was tried at length and removed
-   (`ed25290`…`9f3d1d9`): its inner layers escape ancestor rounded clipping —
-   square slab under rounded outlines. do not reinstall it.
+1. NEVER call `WEBGL_lose_context.loseContext()` in the effect cleanup —
+   strictmode remounts get the SAME (now permanently dead) context from
+   `getContext()`. just stop the loop.
+2. `initGlass` is wrapped in try/catch — the glass layer must never unmount
+   the app.
+3. glass visual checks headlessly: `window.__glassPattern(true)` uploads a
+   stripe texture in place of the camera, then screenshot.
+4. failed approaches, do not revisit: `liquid-glass-react` npm lib (inner
+   layers escape rounded clipping → square slabs, `ed25290`…`9f3d1d9`);
+   per-element svg feImage displacement via `backdrop-filter: url(#…)`
+   (`fcd263e`: correct look but SLOW — 7 backdrop readbacks/frame over live
+   video — and defining the filter inside the filtered element's subtree
+   wedges chromium's compositor).
 
 ## testing (headless — how all of this was verified)
 

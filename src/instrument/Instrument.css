@@ -78,14 +78,40 @@
   transition: opacity 0.15s ease;
 }
 
-/* GlassFx host: invisible carrier for the per-element refraction filter —
-   the effect itself runs on the PARENT's backdrop-filter (see Instrument.tsx) */
+/* GlassShape host: invisible registration marker (see GlassCanvas.tsx) */
 .gw-fx {
   position: absolute;
   width: 0;
   height: 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* the liquid-glass WebGL layer: above video+shade, below every panel */
+.gw-glass-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* shader-glassed elements: the canvas paints their glass body (refraction,
+   dispersion, fresnel, glare) — the DOM keeps only outline + text + lift */
+.gw-lg {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+.gw-lg.gw-card-live {
+  border-color: var(--ink) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--ink),
+    0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  color: var(--ink) !important;
 }
 
 .gw-dim {
