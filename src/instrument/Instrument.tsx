@@ -128,8 +128,8 @@ export default function Instrument() {
   const [melodyOctave, setMelodyOctave] = useState(4);
   const [melodyMode, setMelodyMode] = useState<'auto' | 'free'>('free');
   // The "1" of the piece: index finger plays in-key notes, middle finger the
-  // outside ones. Defaults to g minor, matching the plastic love bank.
-  const [keyRoot, setKeyRoot] = useState(7);
+  // outside ones. Defaults to d minor.
+  const [keyRoot, setKeyRoot] = useState(2);
   const [keyMode, setKeyMode] = useState<'maj' | 'min'>('min');
   const [melodyDegree, setMelodyDegree] = useState<number | null>(null);
 
