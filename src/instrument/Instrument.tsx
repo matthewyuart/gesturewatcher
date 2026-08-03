@@ -15,6 +15,7 @@ import {
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
+import LiquidGlass from 'liquid-glass-react';
 import { Knob } from './Knob';
 import { TechScope } from './TechScope';
 import { StaffChord } from './StaffChord';
@@ -68,47 +69,49 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
 ];
 
 /**
- * Lens displacement map for the glass filter, following the liquid-glass
- * reference implementations: NEUTRAL (127.5) in the center so the panel
- * interior is undistorted, with displacement growing smoothly toward the
- * edges (cubic falloff) — a hard/linear map produces visible stripes.
- * R encodes x-displacement, G encodes y. Generated once on a canvas so the
- * channel encoding is exact (no SVG blend-mode ambiguity).
+ * Liquid-glass skin: mounts rdev/liquid-glass-react as a decorative layer
+ * behind an element's content. The library positions itself as a centered
+ * overlay, so we measure the host and hand it an exactly-sized child.
  */
-function makeLensMap(): string {
-  const S = 128;
-  const c = document.createElement('canvas');
-  c.width = S;
-  c.height = S;
-  const ctx = c.getContext('2d');
-  if (!ctx) return '';
-  const img = ctx.createImageData(S, S);
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const nx = (x / (S - 1)) * 2 - 1;
-      const ny = (y / (S - 1)) * 2 - 1;
-      const edge = Math.min(1, Math.max(Math.abs(nx), Math.abs(ny)));
-      const fall = edge * edge * edge * edge;
-      const i = (y * S + x) * 4;
-      img.data[i] = Math.round(127.5 + nx * fall * 127.5);
-      img.data[i + 1] = Math.round(127.5 + ny * fall * 127.5);
-      img.data[i + 2] = 0;
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return c.toDataURL();
-}
-
-/** Edge refraction layer. Inline style so the fragment url resolves against
- *  the document (external CSS would resolve it against the stylesheet). */
-function GlassEdge() {
+function GlassSkin({ radius }: { radius: number }) {
+  const hostRef = useRef<HTMLSpanElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = hostRef.current?.parentElement;
+    if (!el) return;
+    let timer = 0;
+    const ro = new ResizeObserver(() => {
+      // Debounced: the lib measures itself once on mount, so we remount it
+      // (via key) only after the host size settles.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        setSize({ w: el.offsetWidth, h: el.offsetHeight });
+      }, 150);
+    });
+    ro.observe(el);
+    return () => {
+      window.clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, []);
   return (
-    <span
-      className="hts-glass-edge"
-      aria-hidden
-      style={{ backdropFilter: 'url(#hts-glass)', WebkitBackdropFilter: 'url(#hts-glass)' }}
-    />
+    <span ref={hostRef} className="hts-skin" aria-hidden>
+      {size.w > 8 && (
+        <LiquidGlass
+          key={`${size.w}x${size.h}`}
+          displacementScale={44}
+          blurAmount={0.0625}
+          saturation={130}
+          aberrationIntensity={1.6}
+          elasticity={0}
+          cornerRadius={radius}
+          padding="0px"
+          style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none' }}
+        >
+          <span style={{ display: 'block', width: size.w, height: size.h }} />
+        </LiquidGlass>
+      )}
+    </span>
   );
 }
 
@@ -148,7 +151,6 @@ function normAngle(a: number): number {
 
 export default function Instrument() {
   const { frame, status, source, fps, setSource, videoEl } = useGestures();
-  const [glassMap] = useState(() => makeLensMap());
   const engineRef = useRef<SynthEngine | null>(null);
   if (!engineRef.current) engineRef.current = new SynthEngine();
   const engine = engineRef.current;
@@ -696,27 +698,6 @@ export default function Instrument() {
 
   return (
     <div className="hts-page" data-testid="instrument">
-      {/* Liquid-glass refraction filter: displacement map warps the backdrop
-          at panel edges, split per color channel for chromatic aberration.
-          One shared GPU-composited SVG filter — no per-frame JS. */}
-      <svg className="hts-defs" aria-hidden width="0" height="0">
-        <filter id="hts-glass" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
-          <feImage
-            href={glassMap}
-            x="0" y="0" width="100%" height="100%"
-            preserveAspectRatio="none"
-            result="map"
-          />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-26" xChannelSelector="R" yChannelSelector="G" result="dR" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-20" xChannelSelector="R" yChannelSelector="G" result="dG" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="-14" xChannelSelector="R" yChannelSelector="G" result="dB" />
-          <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
-          <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
-          <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
-          <feBlend in="cR" in2="cG" mode="screen" result="rg" />
-          <feBlend in="rg" in2="cB" mode="screen" />
-        </filter>
-      </svg>
       <div className="hts-title">hts_01.</div>
 
       <div className="hts-stage" ref={stageRef}>
@@ -725,19 +706,19 @@ export default function Instrument() {
         {/* ---- Top-right pills ---- */}
         <div className="hts-pills" ref={registerPanel('pills')}>
           <button
-            className={`gw-pill hts-pill ${showTutorial ? 'gw-active' : ''} ${hotControls.has('tutorial') ? 'gw-hot' : ''}`}
+            className={`gw-pill hts-pill hts-libglass ${showTutorial ? 'gw-active' : ''} ${hotControls.has('tutorial') ? 'gw-hot' : ''}`}
             data-testid="tutorial"
             {...btn('tutorial')}
           >
-            <GlassEdge />
+            <GlassSkin radius={17} />
             tutorial
           </button>
           <button
-            className={`gw-pill hts-pill ${audioOn ? 'gw-active' : ''} ${hotControls.has('power') ? 'gw-hot' : ''}`}
+            className={`gw-pill hts-pill hts-libglass ${audioOn ? 'gw-active' : ''} ${hotControls.has('power') ? 'gw-hot' : ''}`}
             data-testid="power"
             {...btn('power')}
           >
-            <GlassEdge />
+            <GlassSkin radius={17} />
             {audioOn ? 'live' : 'on'}
           </button>
         </div>
@@ -764,7 +745,6 @@ export default function Instrument() {
 
         {/* ---- Tab rail ---- */}
         <nav className="gw-rail" ref={registerPanel('rail')}>
-          <GlassEdge />
           {SHEETS.map((s) => (
             <button
               key={s.id}
@@ -779,7 +759,7 @@ export default function Instrument() {
 
         {/* ---- Sheets ---- */}
         <aside className={`gw-sheet ${openSheet ? 'gw-sheet-open' : ''}`} ref={registerPanel('sheet')}>
-          {openSheet && <GlassEdge />}
+
           {openSheet === 'beat' && (
             <div className="gw-sheet-body" data-testid="sheet-beat">
               <h3 className="gw-sheet-title">beat — seq.16</h3>
@@ -984,12 +964,12 @@ export default function Instrument() {
           {chordSlots.map((s, k) => (
             <button
               key={k}
-              className={`gw-card ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
+              className={`gw-card hts-libglass ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
               ref={registerControl(`card:${k}`) as unknown as Ref<HTMLButtonElement>}
               data-testid={`card-${k}`}
               {...cardHold(k)}
             >
-              <GlassEdge />
+              <GlassSkin radius={12} />
               <span className="gw-card-finger">{FINGER_LABEL[k]}</span>
               <span className="gw-card-name">{chordName(s)}</span>
             </button>
@@ -998,19 +978,20 @@ export default function Instrument() {
 
         {/* ---- Technical scope ---- */}
         <div className="gw-scope-dock" ref={registerPanel('scope')}>
-          <GlassEdge />
           <TechScope engine={engine} />
         </div>
 
         {/* ---- Floating staff: follows the left hand; anchors above the
              chord cards when a chord sounds without a tracked hand ---- */}
         {audioOn && staffPos && (
-          <div className="gw-staff-float" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
+          <div className="gw-staff-float hts-libglass" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
+            <GlassSkin radius={12} />
             <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
         {audioOn && !staffPos && activeSlot !== null && (
-          <div className="gw-staff-float gw-staff-anchored">
+          <div className="gw-staff-float gw-staff-anchored hts-libglass">
+            <GlassSkin radius={12} />
             <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
@@ -1018,7 +999,6 @@ export default function Instrument() {
         {/* ---- Tutorial overlay ---- */}
         {showTutorial && (
           <div className="hts-tutorial" ref={registerPanel('tutorial')} data-testid="tutorial-card">
-            <GlassEdge />
             <h3 className="gw-sheet-title">how to play</h3>
             <p><span className="gw-dim">right hand</span> — pinch to play melody along the top ruler. thumb+index = white keys · thumb+middle = black keys · thumb+ring = slide.</p>
             <p><span className="gw-dim">left hand</span> — thumb+index/middle/ring/pinky holds chords 1–4. the floating staff shows the notes.</p>

@@ -102,22 +102,62 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* Edge refraction band: backdrop warped + chromatically split by the
-   shared #hts-glass SVG filter, masked to the outer rim only. The
-   backdrop-filter itself is set INLINE by <GlassEdge/> — fragment url()
-   in external CSS resolves against the stylesheet, not the document,
-   and silently breaks in production builds. */
-.hts-glass-edge {
+/* liquid-glass-react ships Tailwind utility classnames on its internal
+   layers; without Tailwind they'd be inert (visible slabs that also eat
+   clicks). Minimal shims: */
+.pointer-events-none { pointer-events: none; }
+.bg-black { background-color: #000; }
+.mix-blend-overlay { mix-blend-mode: overlay; }
+.text-white { color: #fff; }
+.opacity-0 { opacity: 0; }
+.opacity-20 { opacity: 0.2; }
+.transition-all { transition-property: all; }
+.duration-150 { transition-duration: 150ms; }
+.ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+.ease-out { transition-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+
+/* liquid-glass-react skin host: centered decorative overlay behind content */
+.hts-skin {
   position: absolute;
   inset: 0;
-  z-index: -1; /* behind the panel's own content — warps only the backdrop */
-  border-radius: inherit;
+  z-index: -1;
   pointer-events: none;
-  padding: 9px;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+}
+
+/* The lib's outer glow/border layers size themselves from an internal
+   measurement that never converges when embedded (stale 228x67 slabs) —
+   the properly-sized glass body carries the look; drop the extras. */
+.hts-skin > span[class=''],
+.hts-skin > span:not([class]),
+.hts-skin > div.bg-black {
+  display: none;
+}
+
+/* elements skinned by the library drop their own CSS glass */
+.hts-libglass {
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.hts-libglass.gw-active,
+.hts-libglass.gw-card-live {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+}
+
+.gw-staff-float {
+  isolation: isolate;
+}
+
+.gw-staff-float.hts-libglass .gw-staff-card {
+  background: none;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 /* ---- Top-right pills ---- */

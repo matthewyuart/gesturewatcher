@@ -36,11 +36,12 @@ export function HandOverlay() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    // Ink follows the detected video tone (set on <body> by the instrument).
-    const dark = document.body.dataset.tone === 'dark';
-    const ink = dark ? '#f5f4f0' : '#17161a';
-    const inkSoft = dark ? 'rgba(245, 244, 240, 0.25)' : 'rgba(23, 22, 26, 0.2)';
-    const inkFill = dark ? 'rgba(245, 244, 240, 0.85)' : 'rgba(23, 22, 26, 0.85)';
+    // Always white over the shaded video, with a dark halo for contrast.
+    const ink = '#ffffff';
+    const inkSoft = 'rgba(255, 255, 255, 0.4)';
+    const inkFill = 'rgba(255, 255, 255, 0.9)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 5;
 
     for (const hand of frame.hands) {
       // Skeleton (camera mode only — mouse mode has no landmarks).
