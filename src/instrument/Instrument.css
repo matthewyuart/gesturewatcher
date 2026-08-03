@@ -403,9 +403,10 @@
   text-align: center;
 }
 
-/* ---- BPM bar ---- */
+/* ---- BPM / shade bars ---- */
 .gw-bpm-bar {
   position: relative;
+  flex: none; /* else flexbox crushes it to fit an overflowing sheet */
   height: 26px;
   border: 1px solid var(--hairline);
   border-radius: 7px;
