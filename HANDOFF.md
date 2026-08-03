@@ -42,10 +42,11 @@ browser; no backend, no samples.
 ## ui (`src/instrument/Instrument.tsx` + `Instrument.css`)
 
 black page, `hts_01.` title outside a rounded (22px) video stage; ALL panels
-live inside the stage. adaptive **shade**: mean video luminance sampled every
-800ms (32×18 canvas readback) drives a black overlay 0.45–0.85 (brighter room
-= more shade) so the always-white ink reads. `.video-shade` must keep
-`z-index` above the video (video is appended after it in the dom).
+live inside the stage. **shade**: a black overlay whose opacity is set by a
+manual slider in the tone sheet (0–0.9, default 0.55; drag with mouse or
+camera pinch — same bar pattern as bpm). the old auto-luminance sampler was
+removed. `.video-shade` must keep `z-index` above the video (video is
+appended after it in the dom).
 
 - top ruler = melody; `tutorial` + `on` pills top-right; tabs `beat/chords/tone` right edge; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
 - typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
@@ -67,7 +68,8 @@ the library assumes its demo environment; all of these are REQUIRED:
 4. `key={size}` remount on settled size — the lib only re-measures on window resize.
 5. static `globalMousePos`/`mouseOffset` props — disables its per-instance mousemove listeners (perf).
 6. `.hts-skin { border-radius: inherit; overflow: hidden }` — restores rounded corners (the lib's radius doesn't clip its warp layers).
-7. `.hts-libglass` strips our css glass under skins; `gw-active`/`gw-card-live` still paint solid ink over the glass.
+7. `.hts-libglass` strips our css glass under skins; `gw-active`/`gw-card-live` on skinned elements render as a **white outline** (border + 1px inset shadow, transparent body) — never a solid fill.
+8. `GlassSkin` is memoized — without it every skin re-renders `LiquidGlass` on every gesture frame.
 
 ## testing (headless — how all of this was verified)
 
@@ -89,7 +91,7 @@ prod smoke: power click → `__synth().running` → pinch → gate/freq → done
 
 ## tunables the user may still want adjusted
 
-- shade curve: `0.42 + luma * 0.5` clamped 0.45–0.85 (`Instrument.tsx` sample()).
+- shade slider: `SHADE_MAX 0.9`, default `0.55` (`Instrument.tsx`).
 - glass: `displacementScale 44 / blurAmount 0.0625 / saturation 130 / aberrationIntensity 1.6` in `GlassSkin`.
 - finger-touch thresholds: `PINCH_ON 0.32 / PINCH_OFF 0.45` ratios in `src/gesture/classify.ts` (shared by pinch + all finger touches).
 - knob twist range: `TWIST_FULL` = 135°.

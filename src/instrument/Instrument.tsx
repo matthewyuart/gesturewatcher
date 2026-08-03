@@ -26,6 +26,7 @@ type Claim =
   | { type: 'knob'; param: keyof SynthParams; startY: number; startVal: number; startRoll: number; twist: boolean }
   | { type: 'chordSlot'; slot: number }
   | { type: 'bpmbar' }
+  | { type: 'shadebar' }
   | { type: 'pressed' };
 
 type SheetId = 'beat' | 'chords' | 'tone';
@@ -75,7 +76,7 @@ const STATIC_MOUSE = { x: 0, y: 0 };
  * behind an element's content. The library positions itself as a centered
  * overlay, so we measure the host and hand it an exactly-sized child.
  */
-function GlassSkin({ radius }: { radius: number }) {
+const GlassSkin = memo(function GlassSkin({ radius }: { radius: number }) {
   const hostRef = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -119,7 +120,7 @@ function GlassSkin({ radius }: { radius: number }) {
       )}
     </span>
   );
-}
+});
 
 // Memoized presentational components — skip re-render on unrelated frames.
 const MKnob = memo(Knob);
@@ -129,6 +130,7 @@ const MStaffChord = memo(StaffChord);
 const TWIST_FULL = (Math.PI * 3) / 4;
 const BPM_MIN = 60;
 const BPM_MAX = 180;
+const SHADE_MAX = 0.9;
 /** Fixed chromatic ruler: 2 octaves + 1, anchored at C — never moves. */
 const RULER_SPAN = 25;
 /** Piano editor range: C3..C5 inclusive. */
@@ -161,7 +163,7 @@ function normAngle(a: number): number {
 }
 
 export default function Instrument() {
-  const { frame, status, source, fps, setSource, videoEl } = useGestures();
+  const { frame, status, source, fps, setSource } = useGestures();
   const engineRef = useRef<SynthEngine | null>(null);
   if (!engineRef.current) engineRef.current = new SynthEngine();
   const engine = engineRef.current;
@@ -184,7 +186,7 @@ export default function Instrument() {
   const [drumPlaying, setDrumPlaying] = useState(false);
   const [genre, setGenre] = useState<GenreId>('citypop');
   const [bpm, setBpm] = useState(GENRES.citypop.bpm);
-  const [shade, setShade] = useState(0.3);
+  const [shade, setShade] = useState(0.55);
 
   const claimsRef = useRef(new Map<number, Claim>());
   const controlsRef = useRef(new Map<string, HTMLElement>());
@@ -194,38 +196,6 @@ export default function Instrument() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const rulerElRef = useRef<HTMLDivElement | null>(null);
   const rulerRectRef = useRef<{ t: number; r: DOMRect | null }>({ t: 0, r: null });
-
-  // Adaptive shade: brighter scene -> more shade, so white ink always pops.
-  useEffect(() => {
-    if (source !== 'camera' || !videoEl) {
-      setShade(0.25);
-      return;
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 18;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-    const sample = () => {
-      if (videoEl.readyState < 2) return;
-      try {
-        ctx.drawImage(videoEl, 0, 0, 32, 18);
-        const d = ctx.getImageData(0, 0, 32, 18).data;
-        let sum = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-        }
-        const luma = sum / (d.length / 4) / 255;
-        const next = Math.min(0.85, Math.max(0.45, 0.42 + luma * 0.5));
-        setShade((prev) => (Math.abs(prev - next) > 0.03 ? next : prev));
-      } catch {
-        // frame not ready — try again next tick
-      }
-    };
-    sample();
-    const id = window.setInterval(sample, 800);
-    return () => window.clearInterval(id);
-  }, [source, videoEl]);
 
   // Scale that fits the sounding (or last) chord. The ruler is a FIXED
   // chromatic ladder; AUTO mode only changes which rungs melody snaps to.
@@ -335,13 +305,13 @@ export default function Instrument() {
     return midi - 12 * (stateRef.current.melodyOctave + 1);
   }, []);
 
-  const xToBpm = useCallback((x: number): number => {
-    const el = controlsRef.current.get('bpm:bar');
-    if (!el) return bpm;
+  /** 0..1 position of x across a registered bar control (null if unmounted). */
+  const barFrac = useCallback((id: string, x: number): number | null => {
+    const el = controlsRef.current.get(id);
+    if (!el) return null;
     const r = el.getBoundingClientRect();
-    const xn = Math.min(1, Math.max(0, (x - r.left) / r.width));
-    return Math.round(BPM_MIN + xn * (BPM_MAX - BPM_MIN));
-  }, [bpm]);
+    return Math.min(1, Math.max(0, (x - r.left) / r.width));
+  }, []);
 
   const applyBpm = useCallback((next: number) => {
     setBpm(() => {
@@ -350,6 +320,16 @@ export default function Instrument() {
       return v;
     });
   }, []);
+
+  const applyBpmAt = useCallback((x: number) => {
+    const f = barFrac('bpm:bar', x);
+    if (f !== null) applyBpm(Math.round(BPM_MIN + f * (BPM_MAX - BPM_MIN)));
+  }, [barFrac, applyBpm]);
+
+  const applyShadeAt = useCallback((x: number) => {
+    const f = barFrac('shade:bar', x);
+    if (f !== null) setShade(Math.round(f * SHADE_MAX * 100) / 100);
+  }, [barFrac]);
 
   /** Button semantics shared by native clicks and camera pinches. */
   const pressButton = useCallback(
@@ -478,14 +458,19 @@ export default function Instrument() {
         }
       }
       if (id === 'bpm:bar') {
-        applyBpm(xToBpm(at.x));
+        applyBpmAt(at.x);
         claimsRef.current.set(handIndex, { type: 'bpmbar' });
+        return;
+      }
+      if (id === 'shade:bar') {
+        applyShadeAt(at.x);
+        claimsRef.current.set(handIndex, { type: 'shadebar' });
         return;
       }
       pressButton(id);
       claimsRef.current.set(handIndex, { type: 'pressed' });
     },
-    [engine, chordOnSlot, pressButton, applyBpm, xToBpm],
+    [engine, chordOnSlot, pressButton, applyBpmAt, applyShadeAt],
   );
 
   useHandEvents({
@@ -518,7 +503,9 @@ export default function Instrument() {
         engine.setParam(claim.param, val);
         setParams({ ...engine.params });
       } else if (claim.type === 'bpmbar') {
-        applyBpm(xToBpm(at.x));
+        applyBpmAt(at.x);
+      } else if (claim.type === 'shadebar') {
+        applyShadeAt(at.x);
       }
     },
     onPinchEnd: (i) => {
@@ -653,11 +640,17 @@ export default function Instrument() {
   const staffSlot = chordSlots[activeSlot ?? lastSlot];
   // Flat-side roots (F, Bb, Eb, Ab, Db, Gb) spell black keys as flats.
   const staffFlats = [5, 10, 3, 8, 1, 6].includes(staffSlot.root);
+  const stageRectRef = useRef<{ t: number; r: DOMRect | null }>({ t: 0, r: null });
   const staffPos = useMemo(() => {
-    const stage = stageRef.current?.getBoundingClientRect();
-    if (!stage) return null;
     const leftHand = frame.hands.find((h) => h.handedness === 'Left' && h.landmarks.length === 21);
     if (!leftHand) return null;
+    // Cached stage rect — no per-frame forced layout while the hand moves.
+    if (performance.now() - stageRectRef.current.t > 1000) {
+      const r = stageRef.current?.getBoundingClientRect() ?? null;
+      stageRectRef.current = { t: performance.now(), r: r && r.width > 8 ? r : null };
+    }
+    const stage = stageRectRef.current.r;
+    if (!stage) return null;
     const x = Math.min(stage.width - 200, Math.max(10, leftHand.cursor.x - stage.left + 26));
     const y = Math.min(stage.height - 160, Math.max(10, leftHand.cursor.y - stage.top - 170));
     return { x, y };
@@ -679,18 +672,21 @@ export default function Instrument() {
     knobDrag.current = null;
   };
 
-  const bpmDrag = useRef(false);
-  const onBpmPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    bpmDrag.current = true;
-    applyBpm(xToBpm(e.clientX));
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onBpmPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (bpmDrag.current) applyBpm(xToBpm(e.clientX));
-  };
-  const onBpmPointerUp = () => {
-    bpmDrag.current = false;
-  };
+  // Horizontal bar drag (bpm / shade): applyAt(x) while the pointer is down.
+  const barDrag = useRef<((x: number) => void) | null>(null);
+  const barHandlers = (applyAt: (x: number) => void) => ({
+    onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
+      barDrag.current = applyAt;
+      applyAt(e.clientX);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
+      barDrag.current?.(e.clientX);
+    },
+    onPointerUp: () => {
+      barDrag.current = null;
+    },
+  });
 
   const cardHold = (slotIdx: number) => ({
     onPointerDown: () => chordOnSlot(slotIdx),
@@ -800,9 +796,7 @@ export default function Instrument() {
                 className="gw-bpm-bar"
                 ref={registerControl('bpm:bar') as unknown as Ref<HTMLDivElement>}
                 data-testid="bpm-bar"
-                onPointerDown={onBpmPointerDown}
-                onPointerMove={onBpmPointerMove}
-                onPointerUp={onBpmPointerUp}
+                {...barHandlers(applyBpmAt)}
               >
                 <div className="gw-bpm-fill" style={{ width: `${((bpm - BPM_MIN) / (BPM_MAX - BPM_MIN)) * 100}%` }} />
               </div>
@@ -950,6 +944,15 @@ export default function Instrument() {
                 <button className="gw-pill" data-testid="oct-down" {...btn('oct:down')}>−</button>
                 <span className="gw-oct-val" data-testid="oct-val">{melodyOctave}</span>
                 <button className="gw-pill" data-testid="oct-up" {...btn('oct:up')}>+</button>
+              </div>
+              <span className="gw-sheet-label">shade ── {Math.round(shade * 100)}%</span>
+              <div
+                className="gw-bpm-bar"
+                ref={registerControl('shade:bar') as unknown as Ref<HTMLDivElement>}
+                data-testid="shade-bar"
+                {...barHandlers(applyShadeAt)}
+              >
+                <div className="gw-bpm-fill" style={{ width: `${(shade / SHADE_MAX) * 100}%` }} />
               </div>
               <span className="gw-sheet-label">tracking</span>
               <div className="gw-cam-row">

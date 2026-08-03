@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
 
-/** Live mirrored camera feed filling the stage, with an adaptive shade on
+/** Live mirrored camera feed filling the stage, with a darkening shade on
  *  top so white ink always reads — the parent sets the shade opacity. */
 export function VideoBackdrop({ shade }: { shade: number }) {
   const { videoEl, source } = useGestures();

@@ -59,7 +59,7 @@
   background: #1a1b1e;
 }
 
-/* adaptive darken layer — opacity driven by measured video luminance.
+/* darken layer — opacity set by the shade slider (tone sheet).
    z-index above the video: the <video> is appended AFTER this div, so
    without it the live feed paints on top and no shade is visible. */
 .video-shade {
@@ -68,7 +68,7 @@
   z-index: 2;
   background: #000;
   pointer-events: none;
-  transition: opacity 0.7s ease;
+  transition: opacity 0.15s ease;
 }
 
 .gw-dim {
@@ -145,10 +145,23 @@
   box-shadow: none !important;
 }
 
+/* active = just a white outline: no fill, and the liquid-glass skin is
+   hidden outright (its warp layers otherwise show through as a slab) */
 .hts-libglass.gw-active,
 .hts-libglass.gw-card-live {
-  background: var(--ink) !important;
+  background: none !important;
   border-color: var(--ink) !important;
+  color: var(--ink) !important;
+}
+
+.hts-libglass.gw-active .hts-skin,
+.hts-libglass.gw-card-live .hts-skin {
+  display: none;
+}
+
+.hts-libglass.gw-card-live .gw-card-finger {
+  color: var(--dim);
+  opacity: 1;
 }
 
 .gw-staff-float {
