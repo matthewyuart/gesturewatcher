@@ -1,0 +1,102 @@
+# hts_01 — handoff
+
+hand tracked synth. right hand plays melody, left hand plays chords, an 8-bit
+drum machine with a synth bass keeps time. everything runs client-side in the
+browser; no backend, no samples.
+
+- **production:** https://gesturewatcher.vercel.app (vercel project `gesturewatcher`, team `matthewyus-projects`, deploys via `vercel deploy --prod --yes`)
+- **repo:** https://github.com/matthewyuart/gesturewatcher (public, branch `main`)
+- **stack:** vite + react 19 + typescript (strict, `erasableSyntaxOnly` — no param properties/enums) · @mediapipe/tasks-vision 1.0.0 · web audio · liquid-glass-react 1.1.1
+- **local dev:** `npm run dev` (predev copies mediapipe wasm from node_modules → `public/mediapipe/wasm`, gitignored; the hand model loads at runtime from google's model cdn)
+
+## interaction model (current, do not regress)
+
+| input | result |
+| --- | --- |
+| right hand, thumb+index | melody, snapped to **white keys** (discrete steps, no glide) |
+| right hand, thumb+middle | melody, snapped to **black keys** |
+| right hand, thumb+ring | melody **slide** (glide 50ms), snapped per auto/free chip |
+| hand x-position | pitch along the top ruler, **left = low** (mapped to the ruler element's rect, cached 1s) |
+| left hand, thumb+index/middle/ring/pinky | chord slots 1–4, held while touched; newest touch wins |
+| pinch a knob + twist wrist | knob turn (135° roll = full range); mouse = vertical drag |
+| mouse | everything also works natively: click buttons, hold chord cards, drag bpm bar/knobs; in mouse mode the synthetic pinch pipeline skips UI (native handlers own it) |
+| `?mouse=1` | force mouse mode (used for all headless testing) |
+
+- **no pitch bend anywhere** — the user was explicit: the displayed note must exactly equal the sounding note ("the TRUTH").
+- the melody ruler is a **fixed 25-step chromatic ladder anchored at c** — chord changes dim/undim rungs, never move them.
+- auto mode snaps the slide finger to the chord-fitting scale (maj/maj7→ionian, min→aeolian, min7→dorian, dom7/sus4→mixolydian, dim→locrian); free = chromatic (default).
+- handedness labels from mediapipe are correct AS-IS for this user — a swap was tried and immediately reverted (`7512e21`). do not swap.
+
+## music engine
+
+- `src/audio/SynthEngine.ts` — 2 lead voices (dual detuned osc, envelope-gated, melody uses voice 0) + poly chord pad → shared lowpass → feedback delay → limiter → analyser. **rejects non-finite frequencies** (guard against NaN from degenerate layout rects — removing this once caused a full react unmount crash).
+- `src/audio/DrumMachine.ts` — 8-bit kit (square kick w/ pitch drop, noise snare/hats) + square **synth bass following the sounding chord root** (set via `setBassRoot`). 16-step patterns: city pop (default, 102bpm) / lofi / bossa / samba / hiphop / pop / house, per-genre swing. lookahead scheduler vs the audio clock: 0.3s horizon visible, 1.5s hidden; `stop()` hard-kills all scheduled sources (tracked in a set) so stop is instant and restarts don't layer.
+- `src/audio/theory.ts` — chord qualities (maj/min/dom7/maj7/min7/sus4/dim/add9) with chord→scale pairings; `ChordSlot` carries an explicit `notes: number[]` voicing (editable per-note on the 2-octave piano in the chords sheet, c3–c5); flat-rooted chords (f/bb/eb/ab/db/gb) spell + name as flats (`Bbmaj7`, ♭ on the staff).
+- progressions presets (chords sheet): city pop royal road (default: fmaj7·g7·em7·am7), pop, 50s, jazz, andalusian, blues.
+
+## gesture engine
+
+- `src/gesture/GestureProvider.tsx` — camera (720p, `object-fit: contain`, **never crop/zoom** — user insists) + mediapipe handlandmarker (2 hands, gpu). one-euro smoothing, pinch hysteresis, per-finger thumb-touch detection (`Hand.fingerTouch`, same hysteresis), wrist roll (`Hand.roll`). **hand coords map to the video's displayed content rect** (letterbox-aware) so cursors sit on the on-screen hand. mouse fallback synthesizes one right hand (click = pinch, with a latch so instant clicks still register). rAF loop with a 150ms timer fallback (headless/hidden tabs pause rAF). react updates are **skipped when hands are static** (perf).
+- `src/gesture/useHandEvents.ts` — pinch start/move/end edge detection (index finger only; melody/chords read `fingerTouch` per-frame in `Instrument`).
+
+## ui (`src/instrument/Instrument.tsx` + `Instrument.css`)
+
+black page, `hts_01.` title outside a rounded (22px) video stage; ALL panels
+live inside the stage. adaptive **shade**: mean video luminance sampled every
+800ms (32×18 canvas readback) drives a black overlay 0.45–0.85 (brighter room
+= more shade) so the always-white ink reads. `.video-shade` must keep
+`z-index` above the video (video is appended after it in the dom).
+
+- top ruler = melody; `tutorial` + `on` pills top-right; tabs `beat/chords/tone` right edge; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
+- typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
+- hand cursor overlay: always **white outlines** + dark halo; pinch = thicker outline ring, **never filled**.
+- central interaction: controls register dom nodes in `controlsRef` (per-id cached ref callbacks); camera pinches hit-test those rects; claims (`claimsRef`) route knob/bpm/chord-card drags per hand. hover glow (`gw-hot`) computed only in camera mode against 400ms-cached rects; mouse uses css `:hover`.
+
+### liquid glass (hard-won — read before touching)
+
+glass = `liquid-glass-react` mounted by `GlassSkin` (in `Instrument.tsx`): an
+absolutely-positioned `.hts-skin` child measures its parent (debounced
+ResizeObserver) and mounts `<LiquidGlass key={w×h} …>` with an exactly-sized
+child span. applied to: the two pills, 4 chord cards, staff float. sheet /
+rail / scope dock use plain css blur glass.
+
+the library assumes its demo environment; all of these are REQUIRED:
+1. **tailwind shims** in `Instrument.css` (`.pointer-events-none`, `.bg-black`, `.opacity-0`, …) — its internal layers otherwise render as visible slabs that also eat clicks.
+2. pass `top: '50%', left: '50%'` in `style` — its glass body otherwise anchors top-left (ghost offset by half its size).
+3. `.hts-skin > span:not([class])` and `> div.bg-black` are `display: none` — the lib's outer glow layers self-measure into a never-converging 228×67 and render as misplaced slabs (this was the user-reported "stripes").
+4. `key={size}` remount on settled size — the lib only re-measures on window resize.
+5. static `globalMousePos`/`mouseOffset` props — disables its per-instance mousemove listeners (perf).
+6. `.hts-skin { border-radius: inherit; overflow: hidden }` — restores rounded corners (the lib's radius doesn't clip its warp layers).
+7. `.hts-libglass` strips our css glass under skins; `gw-active`/`gw-card-live` still paint solid ink over the glass.
+
+## testing (headless — how all of this was verified)
+
+- always test against `http://localhost:5173/?mouse=1` (browser pane has no camera).
+- debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()`.
+- the pane throttles the gesture loop to ~1fps when hidden and **collapses layout to zero size between tool calls**: drive drags as stepped synthetic `PointerEvent`s with 1.3s sleeps between down/move/up; **never trust rect measurements or screenshots for layout verification** — plant an in-page poller that captures rects when width > 0, screenshot (forces layout), then read the report. screenshots may catch transient glass remounts; that's pane-only, not real UX.
+- glass visual checks: paint `.video-backdrop-fallback` with harsh color stripes via js, then screenshot.
+- audio checks: `noteOn` → `__synth().gates/freqs` + rms > 0; drums → poll max rms over ~2s (hits are transient).
+
+## deploy
+
+```bash
+npm run build        # tsc -b && vite build (prebuild copies wasm)
+git push             # public repo
+vercel deploy --prod --yes
+```
+prod smoke: power click → `__synth().running` → pinch → gate/freq → done.
+(the vercel cli here is old, 51.8.0 → 58.4.4; upgrading is recommended but current one works.)
+
+## tunables the user may still want adjusted
+
+- shade curve: `0.42 + luma * 0.5` clamped 0.45–0.85 (`Instrument.tsx` sample()).
+- glass: `displacementScale 44 / blurAmount 0.0625 / saturation 130 / aberrationIntensity 1.6` in `GlassSkin`.
+- finger-touch thresholds: `PINCH_ON 0.32 / PINCH_OFF 0.45` ratios in `src/gesture/classify.ts` (shared by pinch + all finger touches).
+- knob twist range: `TWIST_FULL` = 135°.
+- staff card offset from the left hand: `+26 / -170` px in the `staffPos` memo.
+
+## known rough edges
+
+- camera-only paths (finger-piano routing, twist, staff following) can't be exercised headlessly — user feel is ground truth; everything else has scripted coverage.
+- `liquid-glass-react`'s full displacement effect is chromium-only (safari/firefox fall back to blur).
+- the lib's hidden glow layers mean skinned elements have no hairline border; if edges feel undefined, restore `border-color` on `.hts-libglass`.

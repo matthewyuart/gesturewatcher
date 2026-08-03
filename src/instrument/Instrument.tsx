@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
 import { useHandEvents } from '../gesture/useHandEvents';
 import type { Point } from '../gesture/types';
@@ -68,6 +68,8 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   { id: 'blues', label: 'blues', sub: 'i7–iv7–v7–i7', slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')] },
 ];
 
+const STATIC_MOUSE = { x: 0, y: 0 };
+
 /**
  * Liquid-glass skin: mounts rdev/liquid-glass-react as a decorative layer
  * behind an element's content. The library positions itself as a centered
@@ -106,6 +108,10 @@ function GlassSkin({ radius }: { radius: number }) {
           elasticity={0}
           cornerRadius={radius}
           padding="0px"
+          // Static mouse props: skips the lib's per-instance mousemove
+          // listeners and hover-state re-renders entirely.
+          globalMousePos={STATIC_MOUSE}
+          mouseOffset={STATIC_MOUSE}
           style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none' }}
         >
           <span style={{ display: 'block', width: size.w, height: size.h }} />
@@ -114,6 +120,11 @@ function GlassSkin({ radius }: { radius: number }) {
     </span>
   );
 }
+
+// Memoized presentational components — skip re-render on unrelated frames.
+const MKnob = memo(Knob);
+const MTechScope = memo(TechScope);
+const MStaffChord = memo(StaffChord);
 
 const TWIST_FULL = (Math.PI * 3) / 4;
 const BPM_MIN = 60;
@@ -924,7 +935,7 @@ export default function Instrument() {
                     onPointerMove={onKnobPointerMove}
                     onPointerUp={onKnobPointerUp}
                   >
-                    <Knob
+                    <MKnob
                       label={label}
                       value={params[param]}
                       readout={fmtPct(params[param])}
@@ -978,7 +989,7 @@ export default function Instrument() {
 
         {/* ---- Technical scope ---- */}
         <div className="gw-scope-dock" ref={registerPanel('scope')}>
-          <TechScope engine={engine} />
+          <MTechScope engine={engine} />
         </div>
 
         {/* ---- Floating staff: follows the left hand; anchors above the
@@ -986,13 +997,13 @@ export default function Instrument() {
         {audioOn && staffPos && (
           <div className="gw-staff-float hts-libglass" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
             <GlassSkin radius={12} />
-            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
+            <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
         {audioOn && !staffPos && activeSlot !== null && (
           <div className="gw-staff-float gw-staff-anchored hts-libglass">
             <GlassSkin radius={12} />
-            <StaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
+            <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
 

@@ -122,6 +122,9 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* clip the library's glass to the host's rounded shape */
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 /* The lib's outer glow/border layers size themselves from an internal
@@ -150,6 +153,7 @@
 
 .gw-staff-float {
   isolation: isolate;
+  border-radius: 12px;
 }
 
 .gw-staff-float.hts-libglass .gw-staff-card {

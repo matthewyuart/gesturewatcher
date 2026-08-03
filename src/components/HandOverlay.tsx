@@ -39,7 +39,6 @@ export function HandOverlay() {
     // Always white over the shaded video, with a dark halo for contrast.
     const ink = '#ffffff';
     const inkSoft = 'rgba(255, 255, 255, 0.4)';
-    const inkFill = 'rgba(255, 255, 255, 0.9)';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
     ctx.shadowBlur = 5;
 
@@ -62,18 +61,15 @@ export function HandOverlay() {
         }
       }
 
-      // Cursor ring: shrinks as the pinch closes; fills when pinched.
+      // Cursor ring: shrinks as the pinch closes; pinch = thicker white
+      // OUTLINE (never filled).
       const { x, y } = hand.cursor;
       const radius = 22 - hand.pinchStrength * 10;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = hand.pinch ? 3.5 : 2;
       ctx.strokeStyle = ink;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      if (hand.pinch) {
-        ctx.fillStyle = inkFill;
-        ctx.fill();
-      }
       ctx.fillStyle = ink;
       ctx.beginPath();
       ctx.arc(x, y, 2.5, 0, Math.PI * 2);
