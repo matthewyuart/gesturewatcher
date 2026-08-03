@@ -653,8 +653,25 @@ export default function Instrument() {
     onClick: () => pressButton(id),
   });
 
+  // Liquid-glass refraction: backdrop-filter url() only renders in chromium;
+  // other engines keep the plain blur glass (same look minus the warp).
+  useEffect(() => {
+    if ('chrome' in window) document.documentElement.classList.add('warp-ok');
+    return () => document.documentElement.classList.remove('warp-ok');
+  }, []);
+
   return (
     <div className="hts-page" data-testid="instrument">
+      {/* displacement map for the liquid-glass warp (refs: rdev/liquid-glass-react,
+          github.com/topics/liquid-glass-effect — same effect, applied directly on
+          each element so it clips to that element's own rounded corners) */}
+      <svg className="hts-defs" aria-hidden width="0" height="0">
+        <filter id="hts-glass-warp" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.007 0.007" numOctaves="2" seed="7" result="n" />
+          <feGaussianBlur in="n" stdDeviation="2.5" result="nb" />
+          <feDisplacementMap in="SourceGraphic" in2="nb" scale="77" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       {/* ---- Header on the black bezel: title left, pills right ---- */}
       <div className="hts-header">
         <div className="hts-title">hts_01.</div>

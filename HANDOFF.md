@@ -63,11 +63,17 @@ its own `border-radius` (base rule in `Instrument.css`).
 active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
 glass and boldens the outline: white border + 1px inset ring — never a fill.
 
-`liquid-glass-react` was tried at length and removed (`ed25290`…`ae0413a` era):
-its backdrop-filter layers escape ancestor rounded clipping in chromium, so
-the warp always rendered as a SQUARE slab under rounded outlines — the user
-rejected it explicitly ("simply a rounded corner button"). its removal also
-cut the bundle 442→388 kB and killed a per-frame re-render source.
+**liquid refraction (warp)**: pills / cards / staff card additionally use
+`backdrop-filter: url(#hts-glass-warp) blur(12px) saturate(1.9)` via the
+`.warp-ok` root class (set when `'chrome' in window`; chromium-only — other
+engines keep the plain blur). the filter is an inline svg in `Instrument.tsx`
+(feTurbulence 0.007 → feGaussianBlur 2.5 → feDisplacementMap scale 77,
+`colorInterpolationFilters="sRGB"` REQUIRED or the whole backdrop shifts).
+applied on the element itself it clips to that element's own radius — this is
+the correct way to get the rdev/liquid-glass-react look. the LIBRARY itself
+was tried at length and removed (`ed25290`…`9f3d1d9`): its inner effect
+layers escape ancestor rounded clipping, always rendering a SQUARE slab under
+rounded outlines — the user rejected that explicitly; do not reinstall it.
 
 ## testing (headless — how all of this was verified)
 

@@ -78,6 +78,23 @@
   transition: opacity 0.15s ease;
 }
 
+.hts-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* liquid-glass warp (chromium): displacement filter runs on the element
+   itself, so it refracts the backdrop and still clips to the element's own
+   rounded corners. small interactive surfaces only — the sheet/rail/scope
+   keep the readable plain blur. */
+.warp-ok .hts-pill,
+.warp-ok .gw-card,
+.warp-ok .gw-staff-card {
+  backdrop-filter: url(#hts-glass-warp) blur(12px) saturate(1.9) brightness(1.14);
+  -webkit-backdrop-filter: url(#hts-glass-warp) blur(12px) saturate(1.9) brightness(1.14);
+}
+
 .gw-dim {
   color: var(--dim);
 }
