@@ -201,6 +201,22 @@ export default function Instrument() {
       .catch(() => setAudioOn(false));
   }, [engine]);
 
+  // Live by default: arm the audio as early as the browser allows. The
+  // autoplay policy blocks AudioContext until a user gesture, so try on
+  // mount and retry on the first real interaction (start() is idempotent —
+  // it resumes a suspended context).
+  useEffect(() => {
+    if (audioOn) return;
+    powerOn();
+    const arm = () => powerOn();
+    window.addEventListener('pointerdown', arm, true);
+    window.addEventListener('keydown', arm, true);
+    return () => {
+      window.removeEventListener('pointerdown', arm, true);
+      window.removeEventListener('keydown', arm, true);
+    };
+  }, [audioOn, powerOn]);
+
   const chordOnSlot = useCallback(
     (slotIdx: number) => {
       if (!engine.isRunning) return;
@@ -719,7 +735,8 @@ export default function Instrument() {
         </nav>
 
         {/* ---- Sheets ---- */}
-        <aside className={`gw-sheet ${openSheet ? 'gw-sheet-open' : ''}`} ref={registerPanel('sheet')}>
+        <aside className={`gw-sheet gw-lg ${openSheet ? 'gw-sheet-open' : ''}`} ref={registerPanel('sheet')}>
+          <GlassShape radius={16} />
 
           {openSheet === 'beat' && (
             <div className="gw-sheet-body" data-testid="sheet-beat">

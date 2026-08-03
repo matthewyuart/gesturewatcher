@@ -48,6 +48,14 @@ camera pinch — same bar pattern as bpm). the old auto-luminance sampler was
 removed. `.video-shade` must keep `z-index` above the video (video is
 appended after it in the dom).
 
+- **live by default**: an effect calls `powerOn()` on mount and, because the
+  autoplay policy blocks AudioContext until a gesture, re-arms on the first
+  `pointerdown`/`keydown` (capture phase). `engine.start()` is idempotent —
+  it resumes a suspended ctx — so retrying is free. the `on`/`live` pill just
+  reflects `audioOn`.
+- glass panels: 4 chord cards, staff float, tab rail, **and the sheet**
+  (`gw-lg` + `<GlassShape>`); closed sheet has width 0 so the wrapper skips
+  it. MAX_SHAPES is 16, currently ≤7 in use.
 - top ruler = melody, **right-aligned** (`left: 24%` / `right: 20px`); `auto/free` mode + `tutorial` + `on` pills live in the **bezel header row** next to the title (outside the stage — camera pinches may not reach them, mouse always works); tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; piano black keys are `4.2%` wide (offset `-2.1%` in the tsx); white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
 - typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
 - hand cursor overlay: always **white outlines** + dark halo; pinch = thicker outline ring, **never filled**.
