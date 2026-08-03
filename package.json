@@ -7,7 +7,7 @@
     "predev": "node scripts/copy-wasm.mjs",
     "dev": "vite",
     "prebuild": "node scripts/copy-wasm.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && cp -R glass-lab dist/glass-lab",
     "lint": "oxlint",
     "preview": "vite preview"
   },

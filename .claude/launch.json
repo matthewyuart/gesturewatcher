@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "glass-lab",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4519", "--directory", "glass-lab"],
+      "port": 4519
     }
   ]
 }
