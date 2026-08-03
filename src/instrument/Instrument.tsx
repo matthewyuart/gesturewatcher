@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEv
 import { useGestures } from '../gesture/GestureProvider';
 import { useHandEvents } from '../gesture/useHandEvents';
 import type { Point } from '../gesture/types';
-import { SynthEngine, type SynthParams, type WaveKind } from '../audio/SynthEngine';
+import { SynthEngine, type ChordWave, type SynthParams, type WaveKind } from '../audio/SynthEngine';
 import { DrumMachine, GENRES, type GenreId } from '../audio/DrumMachine';
 import {
   buildChordNotes,
@@ -41,6 +41,8 @@ const WAVE_LABEL: Record<WaveKind, string> = {
   triangle: 'tri',
   sine: 'sin',
 };
+const CHORD_WAVES: ChordWave[] = ['pad', 'sawtooth', 'square', 'triangle', 'sine'];
+const CHORD_WAVE_LABEL: Record<ChordWave, string> = { ...WAVE_LABEL, pad: 'pad' };
 const KNOB_ORDER: Array<{ param: keyof SynthParams; label: string }> = [
   { param: 'cutoff', label: 'filter' },
   { param: 'resonance', label: 'res' },
@@ -122,6 +124,7 @@ export default function Instrument() {
   const [audioOn, setAudioOn] = useState(false);
   const [params, setParams] = useState<SynthParams>({ ...engine.params });
   const [wave, setWaveState] = useState<WaveKind>('sawtooth');
+  const [chordWave, setChordWaveState] = useState<ChordWave>('pad');
   const [melodyOctave, setMelodyOctave] = useState(4);
   const [melodyMode, setMelodyMode] = useState<'auto' | 'free'>('free');
   // The "1" of the piece: index finger plays in-key notes, middle finger the
@@ -330,6 +333,10 @@ export default function Instrument() {
         const w = id.slice(5) as WaveKind;
         engine.setWave(w);
         setWaveState(w);
+      } else if (id.startsWith('cwave:')) {
+        const w = id.slice(6) as ChordWave;
+        engine.setChordWave(w);
+        setChordWaveState(w);
       } else if (id === 'oct:down') {
         setMelodyOctave((o) => Math.max(2, o - 1));
       } else if (id === 'oct:up') {
@@ -927,6 +934,7 @@ export default function Instrument() {
           {openSheet === 'tone' && (
             <div className="gw-sheet-body" data-testid="sheet-tone">
               <h3 className="gw-sheet-title">tone — osc.2</h3>
+              <span className="gw-sheet-label">melody wave</span>
               <div className="gw-wave-row">
                 {WAVES.map((w) => (
                   <button
@@ -936,6 +944,19 @@ export default function Instrument() {
                     {...btn(`wave:${w}`)}
                   >
                     {WAVE_LABEL[w]}
+                  </button>
+                ))}
+              </div>
+              <span className="gw-sheet-label">chord wave // pad = saw bass + triangle above</span>
+              <div className="gw-wave-row">
+                {CHORD_WAVES.map((w) => (
+                  <button
+                    key={w}
+                    className={`gw-pill ${chordWave === w ? 'gw-active' : ''} ${hotControls.has(`cwave:${w}`) ? 'gw-hot' : ''}`}
+                    data-testid={`cwave-${w}`}
+                    {...btn(`cwave:${w}`)}
+                  >
+                    {CHORD_WAVE_LABEL[w]}
                   </button>
                 ))}
               </div>

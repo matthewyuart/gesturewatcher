@@ -1,4 +1,6 @@
 export type WaveKind = 'sawtooth' | 'square' | 'triangle' | 'sine';
+/** Chord pad tone: the four waves, or 'pad' for the original blend. */
+export type ChordWave = WaveKind | 'pad';
 
 export interface SynthParams {
   cutoff: number;   // 0..1 -> 80..9000 Hz (log)
@@ -18,6 +20,7 @@ export interface SynthDebugState {
   rms: number;
   params: SynthParams;
   wave: WaveKind;
+  chordWave: ChordWave;
 }
 
 const CUTOFF_MIN = 80;
@@ -59,6 +62,7 @@ export class SynthEngine {
   private chordVoices: ChordVoice[] = [];
 
   private waveKind: WaveKind = 'sawtooth';
+  private chordWaveKind: ChordWave = 'pad';
   private chordOnFlag = false;
   private scopeBuf: Float32Array | null = null;
 
@@ -144,6 +148,44 @@ export class SynthEngine {
     return this.waveKind;
   }
 
+  /** 'pad' keeps the original blend: saw on the bottom voice, triangle above. */
+  private chordOscType(i: number): OscillatorType {
+    if (this.chordWaveKind === 'pad') return i === 0 ? 'sawtooth' : 'triangle';
+    return this.chordWaveKind;
+  }
+
+  /** Per-wave trim so switching tone doesn't jump the mix level. */
+  private chordLevel(): number {
+    switch (this.chordWaveKind) {
+      case 'square':
+        return 0.085;
+      case 'sawtooth':
+        return 0.105;
+      case 'sine':
+        return 0.185;
+      case 'triangle':
+        return 0.165;
+      default:
+        return 0.14;
+    }
+  }
+
+  setChordWave(wave: ChordWave): void {
+    this.chordWaveKind = wave;
+    if (!this.ctx) return;
+    // Retune anything currently sounding so the change is audible immediately.
+    const t = this.ctx.currentTime;
+    const level = this.chordLevel();
+    this.chordVoices.forEach((v, i) => {
+      v.osc.type = this.chordOscType(i);
+      if (this.chordOnFlag) v.gain.gain.setTargetAtTime(level, t, 0.02);
+    });
+  }
+
+  getChordWave(): ChordWave {
+    return this.chordWaveKind;
+  }
+
   setParam<K extends keyof SynthParams>(key: K, value: number): void {
     this.params[key] = Math.min(1, Math.max(0, value));
     this.applyParams();
@@ -219,14 +261,15 @@ export class SynthEngine {
     this.chordOnFlag = true;
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    const level = this.chordLevel();
     this.chordVoices = freqs.map((freq, i) => {
       const osc = ctx.createOscillator();
-      osc.type = i === 0 ? 'sawtooth' : 'triangle';
+      osc.type = this.chordOscType(i);
       osc.frequency.value = freq;
       osc.detune.value = (i % 2 === 0 ? 1 : -1) * 4;
       const gain = ctx.createGain();
       gain.gain.value = 0;
-      gain.gain.setTargetAtTime(0.14, t, this.attackSec() / 2);
+      gain.gain.setTargetAtTime(level, t, this.attackSec() / 2);
       osc.connect(gain).connect(this.filter);
       osc.start();
       return { osc, gain };
@@ -277,6 +320,7 @@ export class SynthEngine {
       rms,
       params: { ...this.params },
       wave: this.waveKind,
+      chordWave: this.chordWaveKind,
     };
   }
 }
