@@ -704,7 +704,8 @@ export default function Instrument() {
         </div>
 
         {/* ---- Tab rail ---- */}
-        <nav className="gw-rail" ref={registerPanel('rail')}>
+        <nav className="gw-rail gw-lg" ref={registerPanel('rail')}>
+          <GlassShape radius={14} />
           {SHEETS.map((s) => (
             <button
               key={s.id}

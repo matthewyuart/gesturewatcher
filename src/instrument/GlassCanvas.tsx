@@ -65,7 +65,8 @@ export const GlassCanvas = memo(function GlassCanvas({ shade }: { shade: number 
     // The glass layer is decoration — it must never take the app down.
     let glass: LiquidGlass;
     try {
-      glass = new LiquidGlass(canvas, { preset: GLASS_PRESET });
+      // mirror: the DOM video renders with scaleX(-1); sample to match.
+      glass = new LiquidGlass(canvas, { preset: GLASS_PRESET, mirror: true });
     } catch (err) {
       console.error('liquid glass init failed:', err);
       return;

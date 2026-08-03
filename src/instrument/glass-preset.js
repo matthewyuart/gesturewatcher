@@ -61,7 +61,7 @@ export const GLASS_PRESET = {
    * Smooth-min join between shapes, in normalized units (0-0.3).
    * >0 makes nearby panels fuse like mercury; 0 keeps them separate.
    */
-  mergeRate: 0.05,
+  mergeRate: 0,
 
   // --- white border highlight ------------------------------------------
   borderEnabled: false,
