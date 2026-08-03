@@ -16,7 +16,6 @@ import {
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
-import LiquidGlass from 'liquid-glass-react';
 import { Knob } from './Knob';
 import { TechScope } from './TechScope';
 import { StaffChord } from './StaffChord';
@@ -69,59 +68,6 @@ const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: Chord
   { id: 'andalusian', label: 'andalusian', sub: 'i–bvii–bvi–v7', slots: [slot(9, 'min'), slot(7, 'maj'), slot(5, 'maj'), slot(4, 'dom7')] },
   { id: 'blues', label: 'blues', sub: 'i7–iv7–v7–i7', slots: [slot(0, 'dom7'), slot(5, 'dom7'), slot(7, 'dom7'), slot(0, 'dom7')] },
 ];
-
-const STATIC_MOUSE = { x: 0, y: 0 };
-
-/**
- * Liquid-glass skin: mounts rdev/liquid-glass-react as a decorative layer
- * behind an element's content. The library positions itself as a centered
- * overlay, so we measure the host and hand it an exactly-sized child.
- */
-const GlassSkin = memo(function GlassSkin({ radius }: { radius: number }) {
-  const hostRef = useRef<HTMLSpanElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const el = hostRef.current?.parentElement;
-    if (!el) return;
-    let timer = 0;
-    const ro = new ResizeObserver(() => {
-      // Debounced: the lib measures itself once on mount, so we remount it
-      // (via key) only after the host size settles.
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        setSize({ w: el.offsetWidth, h: el.offsetHeight });
-      }, 150);
-    });
-    ro.observe(el);
-    return () => {
-      window.clearTimeout(timer);
-      ro.disconnect();
-    };
-  }, []);
-  return (
-    <span ref={hostRef} className="hts-skin" aria-hidden>
-      {size.w > 8 && (
-        <LiquidGlass
-          key={`${size.w}x${size.h}`}
-          displacementScale={44}
-          blurAmount={0.0625}
-          saturation={130}
-          aberrationIntensity={1.6}
-          elasticity={0}
-          cornerRadius={radius}
-          padding="0px"
-          // Static mouse props: skips the lib's per-instance mousemove
-          // listeners and hover-state re-renders entirely.
-          globalMousePos={STATIC_MOUSE}
-          mouseOffset={STATIC_MOUSE}
-          style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none' }}
-        >
-          <span style={{ display: 'block', width: size.w, height: size.h }} />
-        </LiquidGlass>
-      )}
-    </span>
-  );
-});
 
 // Memoized presentational components — skip re-render on unrelated frames.
 const MKnob = memo(Knob);
@@ -716,27 +662,24 @@ export default function Instrument() {
         {/* ---- Top-right pills ---- */}
         <div className="hts-pills" ref={registerPanel('pills')}>
           <button
-            className={`gw-pill hts-pill hts-libglass ${melodyMode === 'auto' ? 'gw-active' : ''} ${hotControls.has('mode') ? 'gw-hot' : ''}`}
+            className={`gw-pill hts-pill ${melodyMode === 'auto' ? 'gw-active' : ''} ${hotControls.has('mode') ? 'gw-hot' : ''}`}
             data-testid="mode-toggle"
             {...btn('mode')}
           >
-            <GlassSkin radius={17} />
             {melodyMode === 'auto' ? `auto · ${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}` : 'free · chromatic'}
           </button>
           <button
-            className={`gw-pill hts-pill hts-libglass ${showTutorial ? 'gw-active' : ''} ${hotControls.has('tutorial') ? 'gw-hot' : ''}`}
+            className={`gw-pill hts-pill ${showTutorial ? 'gw-active' : ''} ${hotControls.has('tutorial') ? 'gw-hot' : ''}`}
             data-testid="tutorial"
             {...btn('tutorial')}
           >
-            <GlassSkin radius={17} />
             tutorial
           </button>
           <button
-            className={`gw-pill hts-pill hts-libglass ${audioOn ? 'gw-active' : ''} ${hotControls.has('power') ? 'gw-hot' : ''}`}
+            className={`gw-pill hts-pill ${audioOn ? 'gw-active' : ''} ${hotControls.has('power') ? 'gw-hot' : ''}`}
             data-testid="power"
             {...btn('power')}
           >
-            <GlassSkin radius={17} />
             {audioOn ? 'live' : 'on'}
           </button>
         </div>
@@ -984,12 +927,11 @@ export default function Instrument() {
           {chordSlots.map((s, k) => (
             <button
               key={k}
-              className={`gw-card hts-libglass ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
+              className={`gw-card ${activeSlot === k ? 'gw-card-live' : ''} ${hotControls.has(`card:${k}`) ? 'gw-hot' : ''}`}
               ref={registerControl(`card:${k}`) as unknown as Ref<HTMLButtonElement>}
               data-testid={`card-${k}`}
               {...cardHold(k)}
             >
-              <GlassSkin radius={12} />
               <span className="gw-card-finger">{FINGER_LABEL[k]}</span>
               <span className="gw-card-name">{chordName(s)}</span>
             </button>
@@ -1004,14 +946,12 @@ export default function Instrument() {
         {/* ---- Floating staff: follows the left hand; anchors above the
              chord cards when a chord sounds without a tracked hand ---- */}
         {audioOn && staffPos && (
-          <div className="gw-staff-float hts-libglass" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
-            <GlassSkin radius={12} />
+          <div className="gw-staff-float" style={{ transform: `translate(${staffPos.x}px, ${staffPos.y}px)` }}>
             <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}
         {audioOn && !staffPos && activeSlot !== null && (
-          <div className="gw-staff-float gw-staff-anchored hts-libglass">
-            <GlassSkin radius={12} />
+          <div className="gw-staff-float gw-staff-anchored">
             <MStaffChord midis={staffSlot.notes} label={chordName(staffSlot)} preferFlats={staffFlats} />
           </div>
         )}

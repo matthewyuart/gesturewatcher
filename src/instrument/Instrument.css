@@ -102,76 +102,18 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* liquid-glass-react ships Tailwind utility classnames on its internal
-   layers; without Tailwind they'd be inert (visible slabs that also eat
-   clicks). Minimal shims: */
-.pointer-events-none { pointer-events: none; }
-.bg-black { background-color: #000; }
-.mix-blend-overlay { mix-blend-mode: overlay; }
-.text-white { color: #fff; }
-.opacity-0 { opacity: 0; }
-.opacity-20 { opacity: 0.2; }
-.transition-all { transition-property: all; }
-.duration-150 { transition-duration: 150ms; }
-.ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
-.ease-out { transition-timing-function: cubic-bezier(0, 0, 0.2, 1); }
-
-/* liquid-glass-react skin host: centered decorative overlay behind content */
-.hts-skin {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  /* clip the library's glass to the host's rounded shape */
-  border-radius: inherit;
-  overflow: hidden;
-}
-
-/* The lib's outer glow/border layers size themselves from an internal
-   measurement that never converges when embedded (stale 228x67 slabs) —
-   the properly-sized glass body carries the look; drop the extras. */
-.hts-skin > span[class=''],
-.hts-skin > span:not([class]),
-.hts-skin > div.bg-black {
-  display: none;
-}
-
-/* elements skinned by the library drop their own CSS glass but keep a
-   subtle hairline outline so their rounded edges always read */
-.hts-libglass {
-  background: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-color: var(--panel-line) !important;
-  box-shadow: none !important;
-}
-
-/* active = the same glass with a bolder white outline — never a fill,
-   and the liquid-glass skin stays visible */
-.hts-libglass.gw-active,
-.hts-libglass.gw-card-live {
-  background: none !important;
+/* active glass elements keep the same glass and bolden the outline:
+   white border + 1px inset ring (2px total), never a solid fill */
+.hts-pill.gw-active,
+.gw-card.gw-card-live {
+  background: var(--frost) !important;
   border-color: var(--ink) !important;
   box-shadow: inset 0 0 0 1px var(--ink) !important;
   color: var(--ink) !important;
 }
 
-.hts-libglass.gw-card-live .gw-card-finger {
-  color: var(--dim);
-  opacity: 1;
-}
-
 .gw-staff-float {
-  isolation: isolate;
   border-radius: 12px;
-}
-
-.gw-staff-float.hts-libglass .gw-staff-card {
-  background: none;
-  border-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
 }
 
 /* ---- Top-right pills ---- */
@@ -566,17 +508,6 @@
 .gw-card-name {
   font-family: var(--sans);
   font-size: 16px;
-}
-
-.gw-card-live {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--on-ink);
-}
-
-.gw-card-live .gw-card-finger {
-  color: var(--on-ink);
-  opacity: 0.6;
 }
 
 /* ---- Scope dock ---- */

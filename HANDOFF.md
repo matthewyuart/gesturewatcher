@@ -6,7 +6,7 @@ browser; no backend, no samples.
 
 - **production:** https://gesturewatcher.vercel.app (vercel project `gesturewatcher`, team `matthewyus-projects`, deploys via `vercel deploy --prod --yes`)
 - **repo:** https://github.com/matthewyuart/gesturewatcher (public, branch `main`)
-- **stack:** vite + react 19 + typescript (strict, `erasableSyntaxOnly` — no param properties/enums) · @mediapipe/tasks-vision 1.0.0 · web audio · liquid-glass-react 1.1.1
+- **stack:** vite + react 19 + typescript (strict, `erasableSyntaxOnly` — no param properties/enums) · @mediapipe/tasks-vision 1.0.0 · web audio
 - **local dev:** `npm run dev` (predev copies mediapipe wasm from node_modules → `public/mediapipe/wasm`, gitignored; the hand model loads at runtime from google's model cdn)
 
 ## interaction model (current, do not regress)
@@ -48,34 +48,31 @@ camera pinch — same bar pattern as bpm). the old auto-luminance sampler was
 removed. `.video-shade` must keep `z-index` above the video (video is
 appended after it in the dom).
 
-- top ruler = melody (inset `right: 32%` to clear the pills); `auto/free` mode + `tutorial` + `on` pills top-right (all liquid glass); tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
+- top ruler = melody (inset `right: 32%` to clear the pills); `auto/free` mode + `tutorial` + `on` pills top-right; tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
 - typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
 - hand cursor overlay: always **white outlines** + dark halo; pinch = thicker outline ring, **never filled**.
 - central interaction: controls register dom nodes in `controlsRef` (per-id cached ref callbacks); camera pinches hit-test those rects; claims (`claimsRef`) route knob/bpm/chord-card drags per hand. hover glow (`gw-hot`) computed only in camera mode against 400ms-cached rects; mouse uses css `:hover`.
 
-### liquid glass (hard-won — read before touching)
+### glass (plain css — liquid-glass-react was REMOVED, do not reintroduce)
 
-glass = `liquid-glass-react` mounted by `GlassSkin` (in `Instrument.tsx`): an
-absolutely-positioned `.hts-skin` child measures its parent (debounced
-ResizeObserver) and mounts `<LiquidGlass key={w×h} …>` with an exactly-sized
-child span. applied to: the two pills, 4 chord cards, staff float. sheet /
-rail / scope dock use plain css blur glass.
+every glass element (pills, chord cards, staff card, sheet, rail, scope dock,
+tutorial) is ONE element: `background: var(--frost)` + `backdrop-filter:
+blur(18px) saturate(1.55) brightness(1.08)` + `border: 1px solid
+var(--panel-line)` + its own `border-radius` (base rule in `Instrument.css`).
+active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
+glass and boldens the outline: white border + 1px inset ring — never a fill.
 
-the library assumes its demo environment; all of these are REQUIRED:
-1. **tailwind shims** in `Instrument.css` (`.pointer-events-none`, `.bg-black`, `.opacity-0`, …) — its internal layers otherwise render as visible slabs that also eat clicks.
-2. pass `top: '50%', left: '50%'` in `style` — its glass body otherwise anchors top-left (ghost offset by half its size).
-3. `.hts-skin > span:not([class])` and `> div.bg-black` are `display: none` — the lib's outer glow layers self-measure into a never-converging 228×67 and render as misplaced slabs (this was the user-reported "stripes").
-4. `key={size}` remount on settled size — the lib only re-measures on window resize.
-5. static `globalMousePos`/`mouseOffset` props — disables its per-instance mousemove listeners (perf).
-6. `.hts-skin { border-radius: inherit; overflow: hidden }` — restores rounded corners (the lib's radius doesn't clip its warp layers).
-7. `.hts-libglass` strips our css glass under skins but keeps a subtle `--panel-line` hairline; `gw-active`/`gw-card-live` **bolden the outline** (white border + 1px inset ring, transparent body, glass stays visible) — never a solid fill.
-8. `GlassSkin` is memoized — without it every skin re-renders `LiquidGlass` on every gesture frame.
+`liquid-glass-react` was tried at length and removed (`ed25290`…`ae0413a` era):
+its backdrop-filter layers escape ancestor rounded clipping in chromium, so
+the warp always rendered as a SQUARE slab under rounded outlines — the user
+rejected it explicitly ("simply a rounded corner button"). its removal also
+cut the bundle 442→388 kB and killed a per-frame re-render source.
 
 ## testing (headless — how all of this was verified)
 
 - always test against `http://localhost:5173/?mouse=1` (browser pane has no camera).
 - debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()`.
-- the pane throttles the gesture loop to ~1fps when hidden and **collapses layout to zero size between tool calls**: drive drags as stepped synthetic `PointerEvent`s with 1.3s sleeps between down/move/up; **never trust rect measurements or screenshots for layout verification** — plant an in-page poller that captures rects when width > 0, screenshot (forces layout), then read the report. screenshots may catch transient glass remounts; that's pane-only, not real UX.
+- the pane throttles the gesture loop to ~1fps when hidden and **collapses layout to zero size between tool calls**: drive drags as stepped synthetic `PointerEvent`s with 1.3s sleeps between down/move/up; **never trust rect measurements or screenshots for layout verification** — plant an in-page poller that captures rects when width > 0, screenshot (forces layout), then read the report. css transitions pause while the pane is hidden, so computed colors mid-transition read stale; set `transition: none` before reading.
 - glass visual checks: paint `.video-backdrop-fallback` with harsh color stripes via js, then screenshot.
 - audio checks: `noteOn` → `__synth().gates/freqs` + rms > 0; drums → poll max rms over ~2s (hits are transient).
 
@@ -92,7 +89,7 @@ prod smoke: power click → `__synth().running` → pinch → gate/freq → done
 ## tunables the user may still want adjusted
 
 - shade slider: `SHADE_MAX 0.9`, default `0.55` (`Instrument.tsx`).
-- glass: `displacementScale 44 / blurAmount 0.0625 / saturation 130 / aberrationIntensity 1.6` in `GlassSkin`.
+- glass: the `blur(18px) saturate(1.55) brightness(1.08)` backdrop + `--frost` in `Instrument.css` / `index.css`.
 - finger-touch thresholds: `PINCH_ON 0.32 / PINCH_OFF 0.45` ratios in `src/gesture/classify.ts` (shared by pinch + all finger touches).
 - knob twist range: `TWIST_FULL` = 135°.
 - staff card offset from the left hand: `+26 / -170` px in the `staffPos` memo.
@@ -100,5 +97,3 @@ prod smoke: power click → `__synth().running` → pinch → gate/freq → done
 ## known rough edges
 
 - camera-only paths (finger-piano routing, twist, staff following) can't be exercised headlessly — user feel is ground truth; everything else has scripted coverage.
-- `liquid-glass-react`'s full displacement effect is chromium-only (safari/firefox fall back to blur).
-- the lib's hidden glow layers mean skinned elements have no hairline border; if edges feel undefined, restore `border-color` on `.hts-libglass`.
