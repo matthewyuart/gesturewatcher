@@ -20,8 +20,7 @@ export const GROUPS = [
       { key: 'glareConvergence', label: 'glare convergence', type: 'range', min: 0, max: 100, step: 0.01, def: 50 },
       { key: 'glareOppositeFactor', label: 'glare opposite side', type: 'range', min: 0, max: 100, step: 0.01, def: 80 },
       { key: 'glareAngle', label: 'glare angle', type: 'range', min: -180, max: 180, step: 0.01, def: -45 },
-      // studio allows up to 200; the blur shader here unrolls to 100 taps
-      { key: 'blurRadius', label: 'blur radius', type: 'range', min: 1, max: 100, step: 1, def: 1 },
+      { key: 'blurRadius', label: 'blur radius', type: 'range', min: 1, max: 200, step: 1, def: 1 },
       { key: 'blurEdge', label: 'blur edge', type: 'bool', def: true },
       { key: 'tintColor', label: 'tint', type: 'color', def: '#ffffff' },
       { key: 'tintAlpha', label: 'tint alpha', type: 'range', min: 0, max: 100, step: 0.5, def: 0 },
@@ -29,6 +28,7 @@ export const GROUPS = [
       { key: 'shadowFactor', label: 'shadow intensity', type: 'range', min: 0, max: 100, step: 0.01, def: 15 },
       { key: 'shadowX', label: 'shadow position x', type: 'range', min: -20, max: 20, step: 0.1, def: 0 },
       { key: 'shadowY', label: 'shadow position y', type: 'range', min: -20, max: 20, step: 0.1, def: -10 },
+      { key: 'bgType', label: 'background', type: 'bg', def: 0 },
     ],
   },
   {
@@ -40,6 +40,17 @@ export const GROUPS = [
       { key: 'shapeHeight', label: 'shape height', type: 'range', min: 20, max: 800, step: 1, def: 250 },
       { key: 'shapeRadius', label: 'shape radius', type: 'range', min: 1, max: 100, step: 0.1, def: 80 },
       { key: 'shapeRoundness', label: 'shape roundness', type: 'range', min: 2, max: 7, step: 0.01, def: 5 },
+      { key: 'mergeRate', label: 'merge rate', type: 'range', min: 0, max: 0.3, step: 0.01, def: 0.05 },
+      { key: 'showBlob', label: 'show blob', type: 'bool', def: true },
+      { key: 'blobRadius', label: 'blob radius', type: 'range', min: 10, max: 300, step: 1, def: 100 },
+    ],
+  },
+  {
+    id: 'animation',
+    label: 'animation settings',
+    open: false,
+    items: [
+      { key: 'springSizeFactor', label: 'spring size factor', type: 'range', min: 0, max: 50, step: 0.01, def: 10 },
     ],
   },
   {
@@ -47,7 +58,7 @@ export const GROUPS = [
     label: 'border highlight',
     open: true,
     items: [
-      { key: 'borderEnabled', label: 'white border', type: 'bool', def: true },
+      { key: 'borderEnabled', label: 'white border', type: 'bool', def: false },
       { key: 'borderWidth', label: 'border width', type: 'range', min: 0.5, max: 24, step: 0.1, def: 3 },
       { key: 'borderIntensity', label: 'border intensity', type: 'range', min: 0, max: 100, step: 0.5, def: 85 },
     ],
@@ -60,11 +71,33 @@ export const GROUPS = [
       { key: 'mirror', label: 'mirror', type: 'bool', def: true },
     ],
   },
+  {
+    id: 'debug',
+    label: 'debug settings',
+    open: false,
+    items: [
+      // studio "Show Step": 0 sdf, 2 normals, 3 edge factor, 5 blur, 6-8 build-up, 9 full
+      { key: 'step', label: 'show step', type: 'range', min: 0, max: 9, step: 1, def: 9 },
+    ],
+  },
 ];
 
-export const DEFAULTS = Object.fromEntries(
-  GROUPS.flatMap((g) => g.items.map((it) => [it.key, it.def])),
-);
+// Background sources; index 6 means "one of the user's images".
+export const BG_BUILTINS = [
+  { value: 0, label: 'camera' },
+  { value: 1, label: 'checkerboard' },
+  { value: 2, label: 'bars' },
+  { value: 3, label: 'half' },
+  { value: 4, label: 'grid' },
+  { value: 5, label: 'hue field' },
+];
+export const BG_IMAGE = 6;
+
+export const DEFAULTS = {
+  ...Object.fromEntries(GROUPS.flatMap((g) => g.items.map((it) => [it.key, it.def]))),
+  // which user image is showing when bgType === BG_IMAGE (no control row of its own)
+  bgImageIndex: 0,
+};
 
 const KEY_CURRENT = 'glasslab:params';
 const KEY_POS = 'glasslab:pos';

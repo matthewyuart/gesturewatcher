@@ -1,6 +1,120 @@
 // Flat control panel: sliders/toggles for every param + preset save/load.
 
-import { GROUPS, DEFAULTS, listPresets, savePreset, deletePreset, loadPreset } from './params.js';
+import {
+  GROUPS, DEFAULTS, BG_BUILTINS, BG_IMAGE,
+  listPresets, savePreset, deletePreset, loadPreset,
+} from './params.js';
+import { listImages, fileToEntry, addImage, removeImage } from './images.js';
+
+// Background row: built-in patterns + the user's own photos, with add/remove.
+// Returns { el, sync } and exposes cycling for the arrow keys.
+function buildBgControl(params, emit) {
+  const cell = document.createElement('div');
+  cell.className = 'bg-cell';
+
+  const sel = document.createElement('select');
+  sel.setAttribute('data-testid', 'bg-select');
+
+  const addBtn = document.createElement('button');
+  addBtn.textContent = 'add photo';
+  addBtn.setAttribute('data-testid', 'bg-add');
+
+  const delBtn = document.createElement('button');
+  delBtn.textContent = 'remove';
+  delBtn.setAttribute('data-testid', 'bg-remove');
+
+  const file = document.createElement('input');
+  file.type = 'file';
+  file.accept = 'image/*';
+  file.multiple = true;
+  file.hidden = true;
+
+  const row2 = document.createElement('div');
+  row2.className = 'bg-btns';
+  row2.append(addBtn, delBtn);
+  cell.append(sel, row2, file);
+
+  // option value encodes the choice: "b:<type>" or "i:<imageIndex>"
+  const currentValue = () =>
+    params.bgType === BG_IMAGE ? `i:${params.bgImageIndex}` : `b:${params.bgType}`;
+
+  function refresh() {
+    const images = listImages();
+    sel.innerHTML = '';
+    for (const o of BG_BUILTINS) {
+      const opt = document.createElement('option');
+      opt.value = `b:${o.value}`;
+      opt.textContent = o.label;
+      sel.append(opt);
+    }
+    images.forEach((img, i) => {
+      const opt = document.createElement('option');
+      opt.value = `i:${i}`;
+      opt.textContent = img.name;
+      sel.append(opt);
+    });
+    if (params.bgType === BG_IMAGE && params.bgImageIndex >= images.length) {
+      params.bgType = images.length ? BG_IMAGE : 0;
+      params.bgImageIndex = Math.max(0, images.length - 1);
+    }
+    sel.value = currentValue();
+    delBtn.disabled = params.bgType !== BG_IMAGE;
+  }
+
+  function choose(value) {
+    const [kind, n] = value.split(':');
+    if (kind === 'b') {
+      params.bgType = Number(n);
+    } else {
+      params.bgType = BG_IMAGE;
+      params.bgImageIndex = Number(n);
+    }
+    refresh();
+    emit();
+  }
+
+  sel.addEventListener('change', () => choose(sel.value));
+
+  addBtn.addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    const files = [...(file.files || [])];
+    file.value = '';
+    for (const f of files) {
+      try {
+        const idx = addImage(await fileToEntry(f));
+        params.bgType = BG_IMAGE;
+        params.bgImageIndex = idx;
+      } catch (err) {
+        console.warn('[glass-lab] image add failed:', err.message);
+      }
+    }
+    refresh();
+    emit();
+  });
+
+  delBtn.addEventListener('click', () => {
+    if (params.bgType !== BG_IMAGE) return;
+    removeImage(params.bgImageIndex);
+    const images = listImages();
+    if (!images.length) {
+      params.bgType = 0;
+      params.bgImageIndex = 0;
+    } else {
+      params.bgImageIndex = Math.min(params.bgImageIndex, images.length - 1);
+    }
+    refresh();
+    emit();
+  });
+
+  // step through every background in order — bound to the arrow keys
+  function cycle(dir) {
+    const opts = [...sel.options].map((o) => o.value);
+    const at = Math.max(0, opts.indexOf(currentValue()));
+    choose(opts[(at + dir + opts.length) % opts.length]);
+  }
+
+  return { el: cell, sync: refresh, cycle };
+}
 
 function fmt(item, v) {
   if (item.type === 'bool') return '';
@@ -15,7 +129,7 @@ export function buildUI(container, params, onChange) {
   h1.textContent = 'parameters';
   const sub = document.createElement('div');
   sub.className = 'sub';
-  sub.textContent = 'drag the glass to move it';
+  sub.textContent = 'drag the glass · ← → backgrounds';
   container.append(h1, sub);
 
   // ---- presets ----
@@ -76,9 +190,9 @@ export function buildUI(container, params, onChange) {
   }
 
   function setAll(next) {
+    Object.assign(params, next);
     for (const [key, entry] of inputs) {
-      const v = next[key];
-      params[key] = v;
+      const v = params[key];
       if (entry.item.type === 'bool') entry.el.checked = !!v;
       else if (entry.item.type === 'color') entry.el.value = v;
       else {
@@ -86,6 +200,7 @@ export function buildUI(container, params, onChange) {
         entry.valEl.textContent = fmt(entry.item, v);
       }
     }
+    bgControl.sync();
     onChange();
   }
 
@@ -120,6 +235,8 @@ export function buildUI(container, params, onChange) {
 
   refreshPresetList('');
 
+  const bgControl = buildBgControl(params, onChange);
+
   // ---- parameter groups ----
   for (const group of GROUPS) {
     const det = document.createElement('details');
@@ -135,7 +252,10 @@ export function buildUI(container, params, onChange) {
       label.textContent = item.label;
       row.append(label);
 
-      if (item.type === 'bool') {
+      if (item.type === 'bg') {
+        row.append(bgControl.el);
+        bgControl.el.classList.add('span2');
+      } else if (item.type === 'bool') {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = !!params[item.key];
@@ -180,6 +300,16 @@ export function buildUI(container, params, onChange) {
     }
     container.append(det);
   }
+
+  bgControl.sync();
+
+  // arrow keys flick through backgrounds (unless a field has focus)
+  window.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === 'ArrowRight') bgControl.cycle(1);
+    else if (e.key === 'ArrowLeft') bgControl.cycle(-1);
+  });
 
   return { setAll };
 }

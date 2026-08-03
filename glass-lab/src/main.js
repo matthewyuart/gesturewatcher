@@ -2,10 +2,11 @@
 // WebGL2, 4 passes: bg (camera+shadow) → hblur → vblur → glass.
 
 import { VERT, BG_FRAG, BLUR_FRAG, MAIN_FRAG } from './shaders.js';
-import { loadCurrent, saveCurrent, loadPos, savePos } from './params.js';
+import { loadCurrent, saveCurrent, loadPos, savePos, BG_IMAGE } from './params.js';
+import { listImages } from './images.js';
 import { buildUI } from './ui.js';
 
-const MAX_BLUR_RADIUS = 100;
+const MAX_BLUR_RADIUS = 200;
 
 const canvas = document.getElementById('stage');
 const panelEl = document.getElementById('panel');
@@ -96,28 +97,62 @@ let dragging = false;
 let grabDX = 0;
 let grabDY = 0;
 
+// pointer position in css px — the blob shape follows it
+const pointer = { x: -9999, y: -9999 };
+
+function makeTexture(fill) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(fill));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
 let camReady = false;
 let video = null;
-const camTex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, camTex);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([20, 20, 24, 255]));
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+const camTex = makeTexture([20, 20, 24, 255]);
+
+// user photo background
+const imgTex = makeTexture([40, 40, 46, 255]);
+let imgReady = false;
+let imgRatio = 16 / 9;
+let imgLoadedUrl = '';
+
+function loadBgImage(url) {
+  if (url === imgLoadedUrl) return;
+  imgLoadedUrl = url;
+  imgReady = false;
+  if (!url) return;
+  const im = new Image();
+  im.onload = () => {
+    if (imgLoadedUrl !== url) return;
+    gl.bindTexture(gl.TEXTURE_2D, imgTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    imgRatio = im.width / im.height;
+    imgReady = true;
+  };
+  im.onerror = () => { imgReady = false; };
+  im.src = url;
+}
 
 let blurWeights = new Float32Array(MAX_BLUR_RADIUS + 1);
 let blurWeightsRadius = -1;
 
+// matches the studio's computeGaussianKernelByRadius (sigma = radius / 3)
 function computeBlurWeights(radius) {
   if (radius === blurWeightsRadius) return;
   blurWeightsRadius = radius;
   blurWeights = new Float32Array(MAX_BLUR_RADIUS + 1);
   const r = Math.max(radius, 0);
-  const sigma = Math.max(r / 2, 1);
+  const sigma = r / 3.0;
   let sum = 0;
   for (let i = 0; i <= r; i++) {
-    const w = Math.exp(-(i * i) / (2 * sigma * sigma));
+    const w = sigma > 0 ? Math.exp((-0.5 * (i * i)) / (sigma * sigma)) : (i === 0 ? 1 : 0);
     blurWeights[i] = w;
     sum += i === 0 ? w : 2 * w;
   }
@@ -144,11 +179,10 @@ function resize() {
   canvas.width = Math.max(2, Math.round(cssW * dpr));
   canvas.height = Math.max(2, Math.round(cssH * dpr));
 
+  // all three targets are full canvas resolution, as in the studio
   texBg = createTarget(canvas.width, canvas.height);
-  const hw = Math.max(2, Math.round(canvas.width / 2));
-  const hh = Math.max(2, Math.round(canvas.height / 2));
-  texA = createTarget(hw, hh);
-  texB = createTarget(hw, hh);
+  texA = createTarget(canvas.width, canvas.height);
+  texB = createTarget(canvas.width, canvas.height);
 
   if (!spring.init) {
     spring.x = spring.tx = pos.fx * cssW;
@@ -205,6 +239,8 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  pointer.x = e.clientX;
+  pointer.y = e.clientY;
   if (dragging) {
     spring.tx = e.clientX + grabDX;
     spring.ty = e.clientY + grabDY;
@@ -245,12 +281,25 @@ function stepSpring(dt) {
   spring.y += spring.vy * dt;
 }
 
-function setShapeUniforms(u, centerDev, radiusPx) {
+// Shape size stretches with drag speed, as in the studio's springSizeFactor.
+function shapeSize() {
+  const f = params.springSizeFactor / 100;
+  return {
+    w: params.shapeWidth + Math.abs(spring.vx) * 0.02 * params.shapeWidth * f,
+    h: params.shapeHeight + Math.abs(spring.vy) * 0.02 * params.shapeHeight * f,
+  };
+}
+
+function setShapeUniforms(u, centerDev, blobDev, size, radiusPx) {
   gl.uniform2f(u.u_shapeCenter, centerDev[0], centerDev[1]);
-  gl.uniform1f(u.u_shapeWidth, params.shapeWidth);
-  gl.uniform1f(u.u_shapeHeight, params.shapeHeight);
+  gl.uniform2f(u.u_blobCenter, blobDev[0], blobDev[1]);
+  gl.uniform1f(u.u_shapeWidth, size.w);
+  gl.uniform1f(u.u_shapeHeight, size.h);
   gl.uniform1f(u.u_shapeRadius, radiusPx);
   gl.uniform1f(u.u_shapeRoundness, params.shapeRoundness);
+  gl.uniform1f(u.u_blobRadius, params.blobRadius);
+  gl.uniform1f(u.u_mergeRate, params.mergeRate);
+  gl.uniform1i(u.u_showBlob, params.showBlob ? 1 : 0);
 }
 
 let lastT = 0;
@@ -271,50 +320,66 @@ function render(tMs) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   }
 
+  const size = shapeSize();
   const centerDev = [spring.x * dpr, (cssH - spring.y) * dpr];
-  const radiusPx = (Math.min(params.shapeWidth, params.shapeHeight) / 2) * (params.shapeRadius / 100);
-  const camRatio = camReady && video && video.videoWidth ? video.videoWidth / video.videoHeight : 16 / 9;
+  const blobDev = [pointer.x * dpr, (cssH - pointer.y) * dpr];
+  const radiusPx = (Math.min(size.w, size.h) / 2) * (params.shapeRadius / 100);
+
+  // camera and user photos share one background sampler
+  const usingImage = params.bgType === BG_IMAGE;
+  if (usingImage) {
+    const images = listImages();
+    loadBgImage(images[params.bgImageIndex] ? images[params.bgImageIndex].url : '');
+  }
+  const bgTex = usingImage ? imgTex : camTex;
+  const bgTexReady = usingImage ? imgReady : camReady;
+  const bgTexRatio = usingImage
+    ? imgRatio
+    : camReady && video && video.videoWidth
+      ? video.videoWidth / video.videoHeight
+      : 16 / 9;
 
   gl.bindVertexArray(quad);
 
-  // pass 1: background + shadow → texBg (full res)
+  // pass 1: background + shadow → texBg
   gl.bindFramebuffer(gl.FRAMEBUFFER, texBg.fbo);
   gl.viewport(0, 0, texBg.w, texBg.h);
   gl.useProgram(progBg.p);
   gl.uniform2f(progBg.u.u_resolution, texBg.w, texBg.h);
   gl.uniform1f(progBg.u.u_dpr, dpr);
   gl.uniform1f(progBg.u.u_time, t);
-  setShapeUniforms(progBg.u, centerDev, radiusPx);
+  setShapeUniforms(progBg.u, centerDev, blobDev, size, radiusPx);
   gl.uniform1f(progBg.u.u_shadowExpand, params.shadowExpand);
   gl.uniform1f(progBg.u.u_shadowFactor, params.shadowFactor / 100);
   gl.uniform2f(progBg.u.u_shadowPosition, params.shadowX, params.shadowY);
-  gl.uniform1f(progBg.u.u_camRatio, camRatio);
-  gl.uniform1i(progBg.u.u_camReady, camReady ? 1 : 0);
+  gl.uniform1i(progBg.u.u_bgType, params.bgType | 0);
+  gl.uniform1f(progBg.u.u_bgTexRatio, bgTexRatio);
+  gl.uniform1i(progBg.u.u_bgTexReady, bgTexReady ? 1 : 0);
   gl.uniform1i(progBg.u.u_mirror, params.mirror ? 1 : 0);
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, camTex);
-  gl.uniform1i(progBg.u.u_cam, 0);
+  gl.bindTexture(gl.TEXTURE_2D, bgTex);
+  gl.uniform1i(progBg.u.u_bgTex, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // passes 2+3: separable blur at half res
+  // passes 2+3: separable blur, full resolution (vertical then horizontal)
   const radius = Math.round(params.blurRadius);
   computeBlurWeights(radius);
   gl.useProgram(progBlur.p);
   gl.uniform1fv(progBlur.u.u_blurWeights, blurWeights);
   gl.uniform1i(progBlur.u.u_blurRadius, radius);
-  gl.uniform2f(progBlur.u.u_texResolution, texA.w, texA.h);
-  gl.uniform1i(progBlur.u.u_tex, 0);
+  gl.uniform2f(progBlur.u.u_resolution, canvas.width, canvas.height);
+  gl.uniform1i(progBlur.u.u_prevPassTexture, 0);
   gl.activeTexture(gl.TEXTURE0);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, texA.fbo);
   gl.viewport(0, 0, texA.w, texA.h);
-  gl.uniform2f(progBlur.u.u_dir, 1, 0);
+  gl.uniform2f(progBlur.u.u_dir, 0, 1);
   gl.bindTexture(gl.TEXTURE_2D, texBg.tex);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, texB.fbo);
   gl.viewport(0, 0, texB.w, texB.h);
-  gl.uniform2f(progBlur.u.u_dir, 0, 1);
+  gl.uniform2f(progBlur.u.u_dir, 1, 0);
   gl.bindTexture(gl.TEXTURE_2D, texA.tex);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -324,7 +389,8 @@ function render(tMs) {
   gl.useProgram(progMain.p);
   gl.uniform2f(progMain.u.u_resolution, canvas.width, canvas.height);
   gl.uniform1f(progMain.u.u_dpr, dpr);
-  setShapeUniforms(progMain.u, centerDev, radiusPx);
+  setShapeUniforms(progMain.u, centerDev, blobDev, size, radiusPx);
+  gl.uniform1i(progMain.u.u_step, params.step | 0);
   const [tr, tg, tb] = hexToRgb01(params.tintColor);
   gl.uniform4f(progMain.u.u_tint, tr, tg, tb, params.tintAlpha / 100);
   gl.uniform1f(progMain.u.u_refThickness, params.refThickness);
