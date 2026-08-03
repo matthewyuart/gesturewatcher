@@ -63,32 +63,35 @@ its own `border-radius` (base rule in `Instrument.css`).
 active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
 glass and boldens the outline: white border + 1px inset ring — never a fill.
 
-**liquid refraction** (`src/instrument/GlassCanvas.tsx`): ONE WebGL2 canvas
-overlays the stage (`.gw-glass-canvas`, z 3 — above video+shade, below all
-panels) and each frame draws every registered glass shape, sampling the live
-camera texture (mirrored, letterbox-mapped, shade-multiplied, mipmapped for
-the frost lod). shader math ported from **iyinchao/liquid-glass-studio**
-(MIT): rounded-rect SDF → lens-model edge refraction (thickness 16, ior 1.4)
-→ per-channel chromatic dispersion (7) → fresnel rim → angle-lit glare.
-chord cards + staff float opt in via a `<GlassShape radius>` child + `gw-lg`
-class (strips the css glass body; DOM keeps outline/text/lift). pills keep
-css glass (they sit on the black bezel — nothing to refract). works in every
-browser (no backdrop-filter); ~120fps.
+**liquid refraction**: the glass-lab handoff package (`glass-lab/package/`,
+see its README) copied verbatim into `src/instrument/`: `liquid-glass.js`
+(framework-agnostic WebGL2 `LiquidGlass` class, a 4-pass port of
+**iyinchao/liquid-glass-studio** verified side-by-side — full-res backdrop
+blur, snell edge refraction, per-channel dispersion, LCH fresnel + glare,
+metaball merge + spring stretch), `glass-preset.js` (the tuned material — one
+field per lab control) and `GlassCanvas.tsx` (react wrapper). ONE canvas
+overlays the stage (`.gw-glass-canvas`, z 3); chord cards + staff float opt
+in via a `<GlassShape radius>` child + `gw-lg` class (strips css glass body;
+DOM keeps outline/text/lift). pills keep css glass (black bezel — nothing to
+refract). works in every browser; straight-alpha output layers over the dom
+video.
 
-hard-won constraints:
-1. NEVER call `WEBGL_lose_context.loseContext()` in the effect cleanup —
-   strictmode remounts get the SAME (now permanently dead) context from
-   `getContext()`. just stop the loop.
-2. `initGlass` is wrapped in try/catch — the glass layer must never unmount
-   the app.
-3. glass visual checks headlessly: `window.__glassPattern(true)` uploads a
-   stripe texture in place of the camera, then screenshot.
-4. failed approaches, do not revisit: `liquid-glass-react` npm lib (inner
-   layers escape rounded clipping → square slabs, `ed25290`…`9f3d1d9`);
-   per-element svg feImage displacement via `backdrop-filter: url(#…)`
-   (`fcd263e`: correct look but SLOW — 7 backdrop readbacks/frame over live
-   video — and defining the filter inside the filtered element's subtree
-   wedges chromium's compositor).
+- **tune in the lab**: `/glass-lab/` (standalone vite page) → dial controls →
+  "copy config for main app" → paste over `src/instrument/glass-preset.js`.
+- `blurRadius` 1 = clear reference glass; 20–40 if text legibility suffers.
+  `refDispersion` 7 subtle, 20+ rainbow fringing. `mergeRate > 0` = nearby
+  shapes fuse like mercury.
+- glass visual checks headlessly: `window.__glassPattern(true)` substitutes a
+  stripe texture for the camera, then screenshot.
+- the wrapper's try/catch stays — glass must never unmount the app; the
+  renderer never throws after construction.
+- failed approaches, do not revisit: `liquid-glass-react` npm lib (inner
+  layers escape rounded clipping → square slabs, `ed25290`…`9f3d1d9`);
+  per-element svg feImage displacement via `backdrop-filter: url(#…)`
+  (`fcd263e`: right look, but 7 backdrop readbacks/frame = slow, and a filter
+  defined inside the filtered element's subtree wedges chromium's
+  compositor); calling `loseContext()` in react cleanup (strictmode remounts
+  inherit the same, permanently dead context).
 
 ## testing (headless — how all of this was verified)
 
