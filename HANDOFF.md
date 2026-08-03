@@ -98,6 +98,10 @@ hard-won constraints:
 - glass visual checks: paint `.video-backdrop-fallback` with harsh color stripes via js, then screenshot.
 - audio checks: `noteOn` → `__synth().gates/freqs` + rms > 0; drums → poll max rms over ~2s (hits are transient).
 
+## glass-lab (standalone sub-project, `glass-lab/`)
+
+Buildless static playground: liquid glass panel over the live camera, from-scratch 4-pass WebGL2 port of iyinchao/liquid-glass-studio (bg+shadow → h/v gaussian blur at half-res → refraction/dispersion/fresnel/glare/tint, STEP-9 math verbatim; single rounded-rect shape, no shape merge). Extras vs the studio: camera cover-fit background (mirror toggle, animated fallback when denied), draggable spring-damped panel, white border highlight band (width/intensity), full param panel with localStorage autosave (`glasslab:params`, `glasslab:pos`) + named presets (`glasslab:presets`). Independent of the main app — plain ES modules, no npm deps. Dev: launch config `glass-lab` (python http.server :4519). Deployed by `npm run build` copying the folder to `dist/glass-lab` → https://gesturewatcher.vercel.app/glass-lab/. Debug hook: `__glassLab()`.
+
 ## deploy
 
 ```bash
