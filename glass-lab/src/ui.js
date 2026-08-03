@@ -5,7 +5,7 @@ import { GROUPS, DEFAULTS, listPresets, savePreset, deletePreset, loadPreset } f
 function fmt(item, v) {
   if (item.type === 'bool') return '';
   if (item.type === 'color') return '';
-  return item.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(item.step >= 0.1 ? 1 : 2);
+  return item.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(2);
 }
 
 export function buildUI(container, params, onChange) {

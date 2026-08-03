@@ -105,7 +105,8 @@ void main() {
   }
 
   // drop shadow of the glass shape
-  vec2 shadowCenter = u_shapeCenter + vec2(u_shadowPosition.x, -u_shadowPosition.y) * u_dpr;
+  // matches the studio's sign convention: negative y drops the shadow below the shape
+  vec2 shadowCenter = u_shapeCenter + u_shadowPosition * u_dpr;
   vec2 pn = (gl_FragCoord.xy - shadowCenter) / u_resolution.y;
   float merged = roundedRectSDF(
     pn,

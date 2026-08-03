@@ -1,59 +1,45 @@
 // Parameter schema, defaults, and persistence (autosave + named presets).
+// Names, slider ranges, and default values are copied from the
+// liquid-glass-studio control panel so numbers here mean the same thing there.
 
 export const GROUPS = [
   {
-    id: 'shape',
-    label: 'shape',
-    open: true,
-    items: [
-      { key: 'shapeWidth', label: 'width', type: 'range', min: 40, max: 900, step: 1, def: 380 },
-      { key: 'shapeHeight', label: 'height', type: 'range', min: 40, max: 900, step: 1, def: 250 },
-      { key: 'shapeRadius', label: 'radius %', type: 'range', min: 1, max: 100, step: 0.1, def: 80 },
-      { key: 'shapeRoundness', label: 'roundness', type: 'range', min: 2, max: 7, step: 0.01, def: 5 },
-    ],
-  },
-  {
-    id: 'refraction',
-    label: 'refraction',
+    id: 'basic',
+    label: 'basic settings',
     open: true,
     items: [
       { key: 'refThickness', label: 'thickness', type: 'range', min: 1, max: 80, step: 0.01, def: 20 },
-      { key: 'refFactor', label: 'index', type: 'range', min: 1, max: 4, step: 0.01, def: 1.4 },
-      { key: 'refDispersion', label: 'dispersion', type: 'range', min: 0, max: 50, step: 0.01, def: 7 },
-      { key: 'blurRadius', label: 'frost blur', type: 'range', min: 0, max: 100, step: 1, def: 2 },
+      { key: 'refFactor', label: 'refraction factor', type: 'range', min: 1, max: 4, step: 0.01, def: 1.4 },
+      { key: 'refDispersion', label: 'dispersion gain', type: 'range', min: 0, max: 50, step: 0.01, def: 7 },
+      { key: 'refFresnelRange', label: 'fresnel size', type: 'range', min: 0, max: 100, step: 0.01, def: 30 },
+      { key: 'refFresnelHardness', label: 'fresnel hardness', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
+      { key: 'refFresnelFactor', label: 'fresnel intensity', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
+      { key: 'glareRange', label: 'glare size', type: 'range', min: 0, max: 100, step: 0.01, def: 30 },
+      { key: 'glareHardness', label: 'glare hardness', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
+      { key: 'glareFactor', label: 'glare intensity', type: 'range', min: 0, max: 120, step: 0.01, def: 90 },
+      { key: 'glareConvergence', label: 'glare convergence', type: 'range', min: 0, max: 100, step: 0.01, def: 50 },
+      { key: 'glareOppositeFactor', label: 'glare opposite side', type: 'range', min: 0, max: 100, step: 0.01, def: 80 },
+      { key: 'glareAngle', label: 'glare angle', type: 'range', min: -180, max: 180, step: 0.01, def: -45 },
+      // studio allows up to 200; the blur shader here unrolls to 100 taps
+      { key: 'blurRadius', label: 'blur radius', type: 'range', min: 1, max: 100, step: 1, def: 1 },
       { key: 'blurEdge', label: 'blur edge', type: 'bool', def: true },
+      { key: 'tintColor', label: 'tint', type: 'color', def: '#ffffff' },
+      { key: 'tintAlpha', label: 'tint alpha', type: 'range', min: 0, max: 100, step: 0.5, def: 0 },
+      { key: 'shadowExpand', label: 'shadow expand', type: 'range', min: 2, max: 100, step: 0.01, def: 25 },
+      { key: 'shadowFactor', label: 'shadow intensity', type: 'range', min: 0, max: 100, step: 0.01, def: 15 },
+      { key: 'shadowX', label: 'shadow position x', type: 'range', min: -20, max: 20, step: 0.1, def: 0 },
+      { key: 'shadowY', label: 'shadow position y', type: 'range', min: -20, max: 20, step: 0.1, def: -10 },
     ],
   },
   {
-    id: 'fresnel',
-    label: 'fresnel',
-    open: false,
+    id: 'shape',
+    label: 'shape settings',
+    open: true,
     items: [
-      { key: 'refFresnelRange', label: 'range', type: 'range', min: 1, max: 100, step: 0.01, def: 30 },
-      { key: 'refFresnelHardness', label: 'hardness', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
-      { key: 'refFresnelFactor', label: 'factor', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
-    ],
-  },
-  {
-    id: 'glare',
-    label: 'glare',
-    open: false,
-    items: [
-      { key: 'glareRange', label: 'range', type: 'range', min: 1, max: 100, step: 0.01, def: 30 },
-      { key: 'glareHardness', label: 'hardness', type: 'range', min: 0, max: 100, step: 0.01, def: 20 },
-      { key: 'glareFactor', label: 'factor', type: 'range', min: 0, max: 120, step: 0.01, def: 90 },
-      { key: 'glareConvergence', label: 'convergence', type: 'range', min: 0, max: 100, step: 0.01, def: 50 },
-      { key: 'glareOppositeFactor', label: 'opposite', type: 'range', min: 0, max: 100, step: 0.01, def: 80 },
-      { key: 'glareAngle', label: 'angle', type: 'range', min: -180, max: 180, step: 0.01, def: -45 },
-    ],
-  },
-  {
-    id: 'tint',
-    label: 'tint',
-    open: false,
-    items: [
-      { key: 'tintColor', label: 'color', type: 'color', def: '#ffffff' },
-      { key: 'tintAlpha', label: 'amount', type: 'range', min: 0, max: 100, step: 0.5, def: 0 },
+      { key: 'shapeWidth', label: 'shape width', type: 'range', min: 20, max: 800, step: 1, def: 380 },
+      { key: 'shapeHeight', label: 'shape height', type: 'range', min: 20, max: 800, step: 1, def: 250 },
+      { key: 'shapeRadius', label: 'shape radius', type: 'range', min: 1, max: 100, step: 0.1, def: 80 },
+      { key: 'shapeRoundness', label: 'shape roundness', type: 'range', min: 2, max: 7, step: 0.01, def: 5 },
     ],
   },
   {
@@ -62,19 +48,8 @@ export const GROUPS = [
     open: true,
     items: [
       { key: 'borderEnabled', label: 'white border', type: 'bool', def: true },
-      { key: 'borderWidth', label: 'width', type: 'range', min: 0.5, max: 24, step: 0.1, def: 3 },
-      { key: 'borderIntensity', label: 'intensity', type: 'range', min: 0, max: 100, step: 0.5, def: 85 },
-    ],
-  },
-  {
-    id: 'shadow',
-    label: 'shadow',
-    open: false,
-    items: [
-      { key: 'shadowExpand', label: 'expand', type: 'range', min: 2, max: 100, step: 0.01, def: 25 },
-      { key: 'shadowFactor', label: 'factor', type: 'range', min: 0, max: 100, step: 0.01, def: 15 },
-      { key: 'shadowX', label: 'offset x', type: 'range', min: -20, max: 20, step: 0.1, def: 0 },
-      { key: 'shadowY', label: 'offset y', type: 'range', min: -20, max: 20, step: 0.1, def: 10 },
+      { key: 'borderWidth', label: 'border width', type: 'range', min: 0.5, max: 24, step: 0.1, def: 3 },
+      { key: 'borderIntensity', label: 'border intensity', type: 'range', min: 0, max: 100, step: 0.5, def: 85 },
     ],
   },
   {

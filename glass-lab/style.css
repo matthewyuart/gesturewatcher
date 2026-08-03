@@ -44,7 +44,7 @@ html, body {
   top: 14px;
   right: 14px;
   bottom: 14px;
-  width: 268px;
+  width: 300px;
   overflow-y: auto;
   overscroll-behavior: contain;
   background: rgba(8, 8, 10, 0.74);
@@ -151,7 +151,7 @@ html, body {
 
 .ctl {
   display: grid;
-  grid-template-columns: 92px 1fr 44px;
+  grid-template-columns: 118px 1fr 46px;
   align-items: center;
   gap: 8px;
   margin: 6px 0;
