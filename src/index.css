@@ -5,6 +5,12 @@
   --hairline: rgba(242, 241, 238, 0.22);
   --on-ink: #0b0b0d;
   --frost: rgba(255, 255, 255, 0.09);
+  --glass: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.14)
+  );
   --panel-line: rgba(255, 255, 255, 0.26);
   --control-bg: rgba(255, 255, 255, 0.07);
 

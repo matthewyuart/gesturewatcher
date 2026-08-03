@@ -59,8 +59,9 @@ function slot(root: number, q: QualityId): ChordSlot {
   return { root, quality: q, notes: buildChordNotes(root, q, CHORD_OCTAVE) };
 }
 
-/** Common progressions (after Berklee's list), city pop's royal road first. */
+/** Common progressions (after Berklee's list), plastic love's loop first. */
 const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: ChordSlot[] }> = [
+  { id: 'plasticlove', label: 'plastic love', sub: 'ii7–v7–iii7–vi7', slots: [slot(11, 'min7'), slot(4, 'dom7'), slot(1, 'min7'), slot(6, 'min7')] },
   { id: 'citypop', label: 'city pop', sub: 'ivmaj7–v7–iii7–vi7', slots: [slot(5, 'maj7'), slot(7, 'dom7'), slot(4, 'min7'), slot(9, 'min7')] },
   { id: 'pop', label: 'pop', sub: 'i–v–vi–iv', slots: [slot(0, 'maj'), slot(7, 'maj'), slot(9, 'min'), slot(5, 'maj')] },
   { id: 'doowop', label: '50s', sub: 'i–vi–iv–v', slots: [slot(0, 'maj'), slot(9, 'min'), slot(5, 'maj'), slot(7, 'maj')] },
@@ -654,12 +655,9 @@ export default function Instrument() {
 
   return (
     <div className="hts-page" data-testid="instrument">
-      <div className="hts-title">hts_01.</div>
-
-      <div className="hts-stage" ref={stageRef}>
-        <VideoBackdrop shade={shade} />
-
-        {/* ---- Top-right pills ---- */}
+      {/* ---- Header on the black bezel: title left, pills right ---- */}
+      <div className="hts-header">
+        <div className="hts-title">hts_01.</div>
         <div className="hts-pills" ref={registerPanel('pills')}>
           <button
             className={`gw-pill hts-pill ${melodyMode === 'auto' ? 'gw-active' : ''} ${hotControls.has('mode') ? 'gw-hot' : ''}`}
@@ -683,8 +681,12 @@ export default function Instrument() {
             {audioOn ? 'live' : 'on'}
           </button>
         </div>
+      </div>
 
-        {/* ---- Melody ruler along the top ---- */}
+      <div className="hts-stage" ref={stageRef}>
+        <VideoBackdrop shade={shade} />
+
+        {/* ---- Melody ruler along the top, right-aligned ---- */}
         <div className="gw-ruler-wrap">
           <div className="gw-ruler" data-testid="ruler" ref={rulerElRef}>
             {ruler.map((row) => (
@@ -842,7 +844,7 @@ export default function Instrument() {
                             <button
                               key={m}
                               className={`gw-pkey-b ${notes.includes(m) ? 'gw-pkey-on' : ''} ${hotControls.has(`pk:${m}`) ? 'gw-hot' : ''}`}
-                              style={{ left: `calc(${whitesBefore * whiteW}% - 4.5%)` }}
+                              style={{ left: `calc(${whitesBefore * whiteW}% - 2.1%)` }}
                               data-testid={`pk-${m}`}
                               {...btn(`pk:${m}`)}
                             />

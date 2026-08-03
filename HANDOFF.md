@@ -32,7 +32,7 @@ browser; no backend, no samples.
 - `src/audio/SynthEngine.ts` — 2 lead voices (dual detuned osc, envelope-gated, melody uses voice 0) + poly chord pad → shared lowpass → feedback delay → limiter → analyser. **rejects non-finite frequencies** (guard against NaN from degenerate layout rects — removing this once caused a full react unmount crash).
 - `src/audio/DrumMachine.ts` — 8-bit kit (square kick w/ pitch drop, noise snare/hats) + square **synth bass following the sounding chord root** (set via `setBassRoot`). 16-step patterns: city pop (default, 102bpm) / lofi / bossa / samba / hiphop / pop / house, per-genre swing. lookahead scheduler vs the audio clock: 0.3s horizon visible, 1.5s hidden; `stop()` hard-kills all scheduled sources (tracked in a set) so stop is instant and restarts don't layer.
 - `src/audio/theory.ts` — chord qualities (maj/min/dom7/maj7/min7/sus4/dim/add9) with chord→scale pairings; `ChordSlot` carries an explicit `notes: number[]` voicing (editable per-note on the 2-octave piano in the chords sheet, c3–c5); flat-rooted chords (f/bb/eb/ab/db/gb) spell + name as flats (`Bbmaj7`, ♭ on the staff). **`recognizeChord(notes)`** (after derrickward/ChordRecGen) names slots from the actual voicing — exact pitch-class-set match over ~26 templates, every present pc tried as root, root-in-bass preferred, inversions named as slash chords (`Cmaj/E`); `chordName` falls back to stored root+quality only when nothing matches. staff flat-spelling follows the recognized root. auto-mode scale + bass root still use the stored `root`/`quality` (recognition is display-only).
-- progressions presets (chords sheet): city pop royal road (default: fmaj7·g7·em7·am7), pop, 50s, jazz, andalusian, blues.
+- progressions presets (chords sheet): plastic love ii7–v7–iii7–vi7 in A (default: bm7·e7·c#m7·f#m7), city pop royal road, pop, 50s, jazz, andalusian, blues.
 
 ## gesture engine
 
@@ -48,7 +48,7 @@ camera pinch — same bar pattern as bpm). the old auto-luminance sampler was
 removed. `.video-shade` must keep `z-index` above the video (video is
 appended after it in the dom).
 
-- top ruler = melody (inset `right: 32%` to clear the pills); `auto/free` mode + `tutorial` + `on` pills top-right; tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
+- top ruler = melody, **right-aligned** (`left: 24%` / `right: 20px`); `auto/free` mode + `tutorial` + `on` pills live in the **bezel header row** next to the title (outside the stage — camera pinches may not reach them, mouse always works); tabs `beat/chords/tone` right edge; sheets stop at `bottom: 162px` so they clear the scope dock; chord cards bottom row; piano black keys are `4.2%` wide (offset `-2.1%` in the tsx); white bench-style oscilloscope (`TechScope`, rising-edge trigger, freq/vpp readouts) bottom-right; floating staff card (`StaffChord`, hand-rolled svg treble staff w/ accidentals + ledger lines) follows the left hand, anchors above the cards without one.
 - typography: inter (google fonts), regular tracking, **everything lowercase** (`text-transform` on `.hts-page` + `button { text-transform: inherit }`), **nothing bold**.
 - hand cursor overlay: always **white outlines** + dark halo; pinch = thicker outline ring, **never filled**.
 - central interaction: controls register dom nodes in `controlsRef` (per-id cached ref callbacks); camera pinches hit-test those rects; claims (`claimsRef`) route knob/bpm/chord-card drags per hand. hover glow (`gw-hot`) computed only in camera mode against 400ms-cached rects; mouse uses css `:hover`.
@@ -56,9 +56,10 @@ appended after it in the dom).
 ### glass (plain css — liquid-glass-react was REMOVED, do not reintroduce)
 
 every glass element (pills, chord cards, staff card, sheet, rail, scope dock,
-tutorial) is ONE element: `background: var(--frost)` + `backdrop-filter:
-blur(18px) saturate(1.55) brightness(1.08)` + `border: 1px solid
-var(--panel-line)` + its own `border-radius` (base rule in `Instrument.css`).
+tutorial) is ONE element: `background: var(--glass)` (gradient sheen, in
+`index.css`) + `backdrop-filter: blur(26px) saturate(2) brightness(1.18)` +
+`border: 1px solid var(--panel-line)` + inset specular/glow + drop shadow +
+its own `border-radius` (base rule in `Instrument.css`).
 active (`gw-active` on `.hts-pill`, `gw-card-live` on `.gw-card`) keeps the
 glass and boldens the outline: white border + 1px inset ring — never a fill.
 
@@ -89,7 +90,7 @@ prod smoke: power click → `__synth().running` → pinch → gate/freq → done
 ## tunables the user may still want adjusted
 
 - shade slider: `SHADE_MAX 0.9`, default `0.55` (`Instrument.tsx`).
-- glass: the `blur(18px) saturate(1.55) brightness(1.08)` backdrop + `--frost` in `Instrument.css` / `index.css`.
+- glass: the `blur(26px) saturate(2) brightness(1.18)` backdrop in `Instrument.css` + the `--glass` gradient in `index.css`.
 - finger-touch thresholds: `PINCH_ON 0.32 / PINCH_OFF 0.45` ratios in `src/gesture/classify.ts` (shared by pinch + all finger touches).
 - knob twist range: `TWIST_FULL` = 135°.
 - staff card offset from the left hand: `+26 / -170` px in the `staffPos` memo.
