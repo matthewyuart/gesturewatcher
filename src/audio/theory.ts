@@ -27,9 +27,9 @@ export interface ChordQuality {
   scaleName: string;
 }
 
-const IONIAN = [0, 2, 4, 5, 7, 9, 11];
+export const IONIAN = [0, 2, 4, 5, 7, 9, 11];
 const DORIAN = [0, 2, 3, 5, 7, 9, 10];
-const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
+export const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
 const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10];
 const LOCRIAN = [0, 1, 3, 5, 6, 8, 10];
 
@@ -97,6 +97,7 @@ const CHORD_TEMPLATES: Array<{ label: string; pcs: number[] }> = [
   { label: 'min9', pcs: [0, 2, 3, 7, 10] },
   { label: '7b9', pcs: [0, 1, 4, 7, 10] },
   { label: '7#9', pcs: [0, 3, 4, 7, 10] },
+  { label: '13b9', pcs: [0, 1, 4, 9, 10] },
   { label: '11', pcs: [0, 2, 4, 5, 7, 10] },
   { label: '13', pcs: [0, 2, 4, 7, 9, 10] },
   { label: '5', pcs: [0, 7] },

@@ -119,10 +119,14 @@ void main() {
 
   if (u_srcReady == 1) {
     vec2 uv = (gl_FragCoord.xy - u_srcRect.xy) / u_srcRect.zw;
-    if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-      if (u_mirror == 1) uv.x = 1.0 - uv.x;
-      bgColor = texture(u_src, uv).rgb;
-    }
+    // Fade to void over a band instead of a hard cut: dispersion samples R,
+    // G and B at different offsets, so a 1px source edge splits into a
+    // coloured fringe (the red bar along the letterbox boundary).
+    vec2 fade = 12.0 / max(u_srcRect.zw, vec2(1.0));
+    vec2 m = smoothstep(vec2(0.0), fade, uv) * smoothstep(vec2(0.0), fade, 1.0 - uv);
+    vec2 cuv = clamp(uv, 0.0, 1.0);
+    if (u_mirror == 1) cuv.x = 1.0 - cuv.x;
+    bgColor = mix(u_voidColor, texture(u_src, cuv).rgb, m.x * m.y);
   }
 
   // the app's own dimming layer, so refraction samples what the eye sees

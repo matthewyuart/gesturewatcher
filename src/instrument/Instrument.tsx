@@ -13,6 +13,8 @@ import {
   NOTE_NAMES,
   quality,
   recognizeChord,
+  IONIAN,
+  AEOLIAN,
   type ChordSlot,
   type QualityId,
 } from '../audio/theory';
@@ -56,13 +58,14 @@ const SHEETS: Array<{ id: SheetId; label: string }> = [
 
 const CHORD_OCTAVE = 3;
 
-function slot(root: number, q: QualityId): ChordSlot {
-  return { root, quality: q, notes: buildChordNotes(root, q, CHORD_OCTAVE) };
+function slot(root: number, q: QualityId, notes?: number[]): ChordSlot {
+  return { root, quality: q, notes: notes ?? buildChordNotes(root, q, CHORD_OCTAVE) };
 }
 
 /** Common progressions (after Berklee's list), plastic love's loop first. */
 const PROGRESSIONS: Array<{ id: string; label: string; sub: string; slots: ChordSlot[] }> = [
-  { id: 'plasticlove', label: 'plastic love', sub: 'ii7–v7–iii7–vi7', slots: [slot(11, 'min7'), slot(4, 'dom7'), slot(1, 'min7'), slot(6, 'min7')] },
+  // in g minor: Gm7 · C13b9 (c-bb-db-e-a) · Am · Dm7
+  { id: 'plasticlove', label: 'plastic love', sub: 'i7–iv7–ii–v7', slots: [slot(7, 'min7'), slot(0, 'dom7', [48, 58, 61, 64, 69]), slot(9, 'min'), slot(2, 'min7')] },
   { id: 'citypop', label: 'city pop', sub: 'ivmaj7–v7–iii7–vi7', slots: [slot(5, 'maj7'), slot(7, 'dom7'), slot(4, 'min7'), slot(9, 'min7')] },
   { id: 'pop', label: 'pop', sub: 'i–v–vi–iv', slots: [slot(0, 'maj'), slot(7, 'maj'), slot(9, 'min'), slot(5, 'maj')] },
   { id: 'doowop', label: '50s', sub: 'i–vi–iv–v', slots: [slot(0, 'maj'), slot(9, 'min'), slot(5, 'maj'), slot(7, 'maj')] },
@@ -86,8 +89,6 @@ const RULER_SPAN = 25;
 const PIANO_LO = 48;
 const PIANO_SPAN = 25;
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
-const WHITE_SET = new Set(WHITE_PCS);
-const BLACK_SET = new Set([1, 3, 6, 8, 10]);
 const EMPTY_SET: Set<string> = new Set();
 
 /** Nearest midi whose pitch class is in `set` (downward on ties). */
@@ -123,6 +124,10 @@ export default function Instrument() {
   const [wave, setWaveState] = useState<WaveKind>('sawtooth');
   const [melodyOctave, setMelodyOctave] = useState(4);
   const [melodyMode, setMelodyMode] = useState<'auto' | 'free'>('free');
+  // The "1" of the piece: index finger plays in-key notes, middle finger the
+  // outside ones. Defaults to g minor, matching the plastic love bank.
+  const [keyRoot, setKeyRoot] = useState(7);
+  const [keyMode, setKeyMode] = useState<'maj' | 'min'>('min');
   const [melodyDegree, setMelodyDegree] = useState<number | null>(null);
 
   const [chordSlots, setChordSlots] = useState<ChordSlot[]>(PROGRESSIONS[0].slots);
@@ -154,8 +159,16 @@ export default function Instrument() {
     return { root: s.root, steps: q.scaleSteps, name: q.scaleName };
   }, [chordSlots, activeSlot, lastSlot]);
 
-  const stateRef = useRef({ scaleInfo, melodyOctave, melodyMode, chordSlots, source });
-  stateRef.current = { scaleInfo, melodyOctave, melodyMode, chordSlots, source };
+  /** Pitch classes in the key, and the chromatic leftovers. */
+  const keySets = useMemo(() => {
+    const inSet = new Set((keyMode === 'maj' ? IONIAN : AEOLIAN).map((st) => (keyRoot + st) % 12));
+    const outSet = new Set<number>();
+    for (let pc = 0; pc < 12; pc++) if (!inSet.has(pc)) outSet.add(pc);
+    return { inSet, outSet };
+  }, [keyRoot, keyMode]);
+
+  const stateRef = useRef({ scaleInfo, melodyOctave, melodyMode, chordSlots, source, keySets });
+  stateRef.current = { scaleInfo, melodyOctave, melodyMode, chordSlots, source, keySets };
 
   // Bass follows the root of the sounding / last chord.
   useEffect(() => {
@@ -259,8 +272,8 @@ export default function Instrument() {
       ? Math.min(1, Math.max(0, (x - r.left) / r.width))
       : Math.min(1, Math.max(0, (x / window.innerWidth - 0.12) / 0.76));
     const midi = 12 * (s.melodyOctave + 1) + Math.round((Number.isFinite(xn) ? xn : 0.5) * (RULER_SPAN - 1));
-    if (finger === 0) return snapToSet(midi, WHITE_SET);
-    if (finger === 1) return snapToSet(midi, BLACK_SET);
+    if (finger === 0) return snapToSet(midi, s.keySets.inSet);
+    if (finger === 1) return snapToSet(midi, s.keySets.outSet);
     if (s.melodyMode === 'free') return midi;
     const set = new Set(s.scaleInfo.steps.map((st) => (s.scaleInfo.root + st) % 12));
     return snapToSet(midi, set);
@@ -309,6 +322,10 @@ export default function Instrument() {
         setOpenSheet((cur) => (cur === sheet ? null : sheet));
       } else if (id === 'mode') {
         setMelodyMode((m) => (m === 'auto' ? 'free' : 'auto'));
+      } else if (id.startsWith('key:')) {
+        setKeyRoot(Number(id.slice(4)));
+      } else if (id.startsWith('keymode:')) {
+        setKeyMode(id.slice(8) as 'maj' | 'min');
       } else if (id.startsWith('wave:')) {
         const w = id.slice(5) as WaveKind;
         engine.setWave(w);
@@ -383,6 +400,8 @@ export default function Instrument() {
       const d = drumRef.current;
       return d ? { playing: d.isPlaying, genre: d.genre, bpm: d.bpm } : null;
     };
+    // finger-piano routing is camera-only; this makes it testable headlessly
+    w.__melody = (finger: number, x: number) => midiName(melodyMidiFor(finger, x));
     w.__ui = () => ({
       audioOn,
       openSheet,
@@ -392,8 +411,9 @@ export default function Instrument() {
       shade,
       chords: stateRef.current.chordSlots.map(chordName),
       scale: `${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}`,
+      key: `${NOTE_NAMES[keyRoot]} ${keyMode}`,
     });
-  }, [engine, audioOn, openSheet, melodyMode, scaleInfo, genre, bpm, shade]);
+  }, [engine, audioOn, openSheet, melodyMode, scaleInfo, genre, bpm, shade, keyRoot, keyMode, melodyMidiFor]);
 
   const overAnyPanel = useCallback((p: Point): boolean => {
     for (const el of panelsRef.current.values()) if (inRect(el, p)) return true;
@@ -782,6 +802,33 @@ export default function Instrument() {
           {openSheet === 'chords' && (
             <div className="gw-sheet-body" data-testid="sheet-chords">
               <h3 className="gw-sheet-title">chords — bank.04</h3>
+              <span className="gw-sheet-label">
+                key — the “1” // index finger plays in-key, middle finger outside
+              </span>
+              <div className="gw-root-grid">
+                {NOTE_NAMES.map((n, i) => (
+                  <button
+                    key={n}
+                    className={`gw-pill ${keyRoot === i ? 'gw-active' : ''} ${hotControls.has(`key:${i}`) ? 'gw-hot' : ''}`}
+                    data-testid={`key-${i}`}
+                    {...btn(`key:${i}`)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="gw-slot-row">
+                {(['maj', 'min'] as const).map((m) => (
+                  <button
+                    key={m}
+                    className={`gw-pill ${keyMode === m ? 'gw-active' : ''} ${hotControls.has(`keymode:${m}`) ? 'gw-hot' : ''}`}
+                    data-testid={`keymode-${m}`}
+                    {...btn(`keymode:${m}`)}
+                  >
+                    {m === 'maj' ? 'major' : 'minor'}
+                  </button>
+                ))}
+              </div>
               <span className="gw-sheet-label">progressions</span>
               <div className="gw-preset-list">
                 {PROGRESSIONS.map((p) => (
@@ -985,7 +1032,7 @@ export default function Instrument() {
         {showTutorial && (
           <div className="hts-tutorial" ref={registerPanel('tutorial')} data-testid="tutorial-card">
             <h3 className="gw-sheet-title">how to play</h3>
-            <p><span className="gw-dim">right hand</span> — pinch to play melody along the top ruler. thumb+index = white keys · thumb+middle = black keys · thumb+ring = slide.</p>
+            <p><span className="gw-dim">right hand</span> — pinch to play melody along the top ruler. thumb+index = notes in the key · thumb+middle = notes outside it · thumb+ring = slide.</p>
             <p><span className="gw-dim">left hand</span> — thumb+index/middle/ring/pinky holds chords 1–4. the floating staff shows the notes.</p>
             <p><span className="gw-dim">knobs</span> — pinch, then twist your wrist. everything also works with a mouse.</p>
             <p><span className="gw-dim">first</span> — press “on” to arm the audio, open beat and press play.</p>

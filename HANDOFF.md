@@ -13,8 +13,8 @@ browser; no backend, no samples.
 
 | input | result |
 | --- | --- |
-| right hand, thumb+index | melody, snapped to **white keys** (discrete steps, no glide) |
-| right hand, thumb+middle | melody, snapped to **black keys** |
+| right hand, thumb+index | melody, snapped to notes **in the key** (discrete steps, no glide) |
+| right hand, thumb+middle | melody, snapped to the notes **outside the key** (chromatic complement) |
 | right hand, thumb+ring | melody **slide** (glide 50ms), snapped per auto/free chip |
 | hand x-position | pitch along the top ruler, **left = low** (mapped to the ruler element's rect, cached 1s) |
 | left hand, thumb+index/middle/ring/pinky | chord slots 1–4, held while touched; newest touch wins |
@@ -32,7 +32,8 @@ browser; no backend, no samples.
 - `src/audio/SynthEngine.ts` — 2 lead voices (dual detuned osc, envelope-gated, melody uses voice 0) + poly chord pad → shared lowpass → feedback delay → limiter → analyser. **rejects non-finite frequencies** (guard against NaN from degenerate layout rects — removing this once caused a full react unmount crash).
 - `src/audio/DrumMachine.ts` — 8-bit kit (square kick w/ pitch drop, noise snare/hats) + square **synth bass following the sounding chord root** (set via `setBassRoot`). 16-step patterns: city pop (default, 102bpm) / lofi / bossa / samba / hiphop / pop / house, per-genre swing. lookahead scheduler vs the audio clock: 0.3s horizon visible, 1.5s hidden; `stop()` hard-kills all scheduled sources (tracked in a set) so stop is instant and restarts don't layer.
 - `src/audio/theory.ts` — chord qualities (maj/min/dom7/maj7/min7/sus4/dim/add9) with chord→scale pairings; `ChordSlot` carries an explicit `notes: number[]` voicing (editable per-note on the 2-octave piano in the chords sheet, c3–c5); flat-rooted chords (f/bb/eb/ab/db/gb) spell + name as flats (`Bbmaj7`, ♭ on the staff). **`recognizeChord(notes)`** (after derrickward/ChordRecGen) names slots from the actual voicing — exact pitch-class-set match over ~26 templates, every present pc tried as root, root-in-bass preferred, inversions named as slash chords (`Cmaj/E`); `chordName` falls back to stored root+quality only when nothing matches. staff flat-spelling follows the recognized root. auto-mode scale + bass root still use the stored `root`/`quality` (recognition is display-only).
-- progressions presets (chords sheet): plastic love ii7–v7–iii7–vi7 in A (default: bm7·e7·c#m7·f#m7), city pop royal road, pop, 50s, jazz, andalusian, blues.
+- **key** (`keyRoot`/`keyMode`, chords sheet, default **g minor**) is the "1" of the piece and only drives the two melody fingers above: index snaps to the ionian/aeolian set on that root, middle to the 5 leftovers. c major degenerates to the old white/black split. it does NOT affect chord voicings or the ring-finger auto scale (that still follows the sounding chord).
+- progressions presets (chords sheet): plastic love in g minor (default: gm7 · **c13b9** `c-bb-db-e-a` · am · dm7), city pop royal road, pop, 50s, jazz, andalusian, blues. `slot(root, quality, notes?)` takes an explicit voicing for chords the default builder can't spell.
 
 ## gesture engine
 
@@ -101,6 +102,10 @@ video.
   its rect per frame and a css tween makes glass and dom shear apart.
 - glass visual checks headlessly: `window.__glassPattern(true)` substitutes a
   stripe texture for the camera, then screenshot.
+- the backdrop pass fades the source to `voidColor` over a **12px band** at
+  the letterbox edges. do not restore the hard `if (uv in 0..1)` cut: the
+  dispersion samples r/g/b at different offsets, so a 1px source edge splits
+  into a coloured fringe (the user-reported "red bar" down the right side).
 - the wrapper's try/catch stays — glass must never unmount the app; the
   renderer never throws after construction.
 - failed approaches, do not revisit: `liquid-glass-react` npm lib (inner
@@ -114,7 +119,7 @@ video.
 ## testing (headless — how all of this was verified)
 
 - always test against `http://localhost:5173/?mouse=1` (browser pane has no camera).
-- debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()`.
+- debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()`, `__melody(finger, clientX)` → note name (makes the camera-only finger-piano routing testable: sweep x across the ruler rect and assert the pitch-class set).
 - the pane throttles the gesture loop to ~1fps when hidden and **collapses layout to zero size between tool calls**: drive drags as stepped synthetic `PointerEvent`s with 1.3s sleeps between down/move/up; **never trust rect measurements or screenshots for layout verification** — plant an in-page poller that captures rects when width > 0, screenshot (forces layout), then read the report. css transitions pause while the pane is hidden, so computed colors mid-transition read stale; set `transition: none` before reading.
 - glass visual checks: paint `.video-backdrop-fallback` with harsh color stripes via js, then screenshot.
 - audio checks: `noteOn` → `__synth().gates/freqs` + rms > 0; drums → poll max rms over ~2s (hits are transient).
