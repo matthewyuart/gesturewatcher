@@ -160,11 +160,71 @@ export function buildUI(container, params, onChange) {
   resetBtn.textContent = 'reset';
   rowActs.append(delBtn, resetBtn);
 
+  const rowExport = document.createElement('div');
+  rowExport.className = 'preset-row';
+  const exportBtn = document.createElement('button');
+  exportBtn.textContent = 'copy config for main app';
+  exportBtn.setAttribute('data-testid', 'preset-export');
+  rowExport.append(exportBtn);
+
+  // shown when the clipboard is unavailable, so the config is still copyable
+  const exportOut = document.createElement('textarea');
+  exportOut.className = 'export-out';
+  exportOut.readOnly = true;
+  exportOut.spellcheck = false;
+  exportOut.hidden = true;
+
   const msg = document.createElement('div');
   msg.className = 'saved-msg';
 
-  block.append(sel, rowName, rowActs, msg);
+  block.append(sel, rowName, rowActs, rowExport, exportOut, msg);
   container.append(block);
+
+  // Emit glass-preset.js exactly as the handoff package expects it.
+  const MATERIAL_KEYS = [
+    'refThickness', 'refFactor', 'refDispersion',
+    'refFresnelRange', 'refFresnelHardness', 'refFresnelFactor',
+    'glareRange', 'glareHardness', 'glareFactor', 'glareConvergence',
+    'glareOppositeFactor', 'glareAngle',
+    'blurRadius', 'blurEdge', 'tintColor', 'tintAlpha',
+    'shadowExpand', 'shadowFactor', 'shadowX', 'shadowY',
+    'shapeRoundness', 'mergeRate',
+    'borderEnabled', 'borderWidth', 'borderIntensity',
+  ];
+
+  function buildConfig() {
+    const lines = MATERIAL_KEYS.map((k) => {
+      const v = params[k];
+      return `  ${k}: ${typeof v === 'string' ? `'${v}'` : v},`;
+    });
+    return [
+      '/**',
+      ' * Liquid-glass material preset — exported from the glass lab.',
+      ' * Paste over glass-lab/package/glass-preset.js (or src/instrument/glass-preset.js).',
+      ' */',
+      'export const GLASS_PRESET = {',
+      ...lines,
+      '};',
+      '',
+      'export default GLASS_PRESET;',
+      '',
+    ].join('\n');
+  }
+
+  exportBtn.addEventListener('click', async () => {
+    const text = buildConfig();
+    exportOut.value = text;
+    try {
+      await navigator.clipboard.writeText(text);
+      flash('config copied to clipboard');
+      exportOut.hidden = true;
+    } catch {
+      exportOut.hidden = false;
+      exportOut.focus();
+      exportOut.select();
+      flash('clipboard blocked — copy from the box');
+    }
+  });
 
   let msgTimer = 0;
   function flash(text) {
