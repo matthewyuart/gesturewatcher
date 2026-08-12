@@ -231,6 +231,12 @@ export function GestureProvider({ children }: { children: ReactNode }) {
         fpsWindowStart = t;
       }
 
+      // Test hook: synthetic hands drive the whole pipeline so camera-only
+      // interactions (finger piano, chord fingers, wrist tilt) can be
+      // exercised headlessly. Inert unless something sets it.
+      const injected = (window as unknown as { __testHands?: Hand[] }).__testHands;
+      if (injected) hands = injected;
+
       // Skip the React update when nothing observable changed — kills
       // per-frame re-renders while hands are absent or perfectly still.
       if (!handsEqual(lastHands, hands)) {

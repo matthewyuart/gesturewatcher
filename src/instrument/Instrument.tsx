@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEv
 import { useGestures } from '../gesture/GestureProvider';
 import { useHandEvents } from '../gesture/useHandEvents';
 import type { Point } from '../gesture/types';
+import { tiltAmount, tiltCutoff, tiltState } from '../gesture/tilt';
 import { SynthEngine, type ChordWave, type SynthParams, type WaveKind } from '../audio/SynthEngine';
 import { DrumMachine, GENRES, type GenreId } from '../audio/DrumMachine';
 import {
@@ -249,6 +250,56 @@ export default function Instrument() {
     setActiveSlot(null);
   }, [engine]);
 
+  // ---- Left-hand tilt -> filter ----------------------------------------
+  // The filter knob sets a BASE value; the left hand's wrist angle
+  // modulates around it (straight up = untouched). engine.params.cutoff
+  // therefore holds the live, tilted value, so knob interactions have to
+  // read and write the base instead of the engine's current value.
+  const filterBaseRef = useRef(engine.params.cutoff);
+  const tiltRef = useRef(0);
+  const tiltHeldRef = useRef(false);
+  const tiltArmedRef = useRef(true);
+
+  const lastCutoffRef = useRef(engine.params.cutoff);
+  const applyTilt = useCallback(
+    (tilt: number) => {
+      tiltRef.current = tilt;
+      const cutoff = tiltCutoff(filterBaseRef.current, tilt);
+      tiltState.base = filterBaseRef.current;
+      tiltState.cutoff = cutoff;
+      tiltState.tilt = tilt;
+      // This runs on every frame the hand moves at all. Re-anchoring the
+      // filter's ramp with an unchanged target would keep restarting the
+      // approach and stop it ever settling, so only touch audio on a real
+      // change (0.0005 of the normalised range is far below audible).
+      if (Math.abs(cutoff - lastCutoffRef.current) < 0.0005) return;
+      lastCutoffRef.current = cutoff;
+      engine.sweepCutoff(cutoff);
+    },
+    [engine],
+  );
+
+  /** Starting value for a knob drag — cutoff drags move the base. */
+  const knobStart = useCallback(
+    (param: keyof SynthParams): number =>
+      param === 'cutoff' ? filterBaseRef.current : engine.params[param],
+    [engine],
+  );
+
+  /** Commit a knob value; the displayed cutoff is always the base. */
+  const applyKnob = useCallback(
+    (param: keyof SynthParams, value: number) => {
+      if (param === 'cutoff') {
+        filterBaseRef.current = Math.min(1, Math.max(0, value));
+        applyTilt(tiltRef.current);
+      } else {
+        engine.setParam(param, value);
+      }
+      setParams({ ...engine.params, cutoff: filterBaseRef.current });
+    },
+    [engine, applyTilt],
+  );
+
   const rulerRect = useCallback((): DOMRect | null => {
     if (performance.now() - rulerRectRef.current.t > 1000) {
       const r = rulerElRef.current?.getBoundingClientRect() ?? null;
@@ -409,6 +460,9 @@ export default function Instrument() {
     };
     // finger-piano routing is camera-only; this makes it testable headlessly
     w.__melody = (finger: number, x: number) => midiName(melodyMidiFor(finger, x));
+    // Tilt helpers are exposed so the mapping can be exercised headlessly
+    // (mouse mode has no landmarks, so roll is always 0 there).
+    w.__tilt = () => ({ ...tiltState, amount: tiltAmount, cutoffFor: tiltCutoff });
     w.__ui = () => ({
       audioOn,
       openSheet,
@@ -416,6 +470,9 @@ export default function Instrument() {
       genre,
       bpm,
       shade,
+      tilt: tiltState.tilt,
+      filterBase: tiltState.base,
+      filterLive: tiltState.cutoff,
       chords: stateRef.current.chordSlots.map(chordName),
       scale: `${NOTE_NAMES[scaleInfo.root]} ${scaleInfo.name}`,
       key: `${NOTE_NAMES[keyRoot]} ${keyMode}`,
@@ -437,7 +494,7 @@ export default function Instrument() {
         const param = id.slice(5) as keyof SynthParams;
         claimsRef.current.set(handIndex, {
           type: 'knob', param, startY: at.y,
-          startVal: engine.params[param], startRoll: roll, twist: hasLandmarks,
+          startVal: knobStart(param), startRoll: roll, twist: hasLandmarks,
         });
         return;
       }
@@ -462,7 +519,7 @@ export default function Instrument() {
       pressButton(id);
       claimsRef.current.set(handIndex, { type: 'pressed' });
     },
-    [engine, chordOnSlot, pressButton, applyBpmAt, applyShadeAt],
+    [engine, chordOnSlot, pressButton, applyBpmAt, applyShadeAt, knobStart],
   );
 
   useHandEvents({
@@ -492,8 +549,7 @@ export default function Instrument() {
         const val = claim.twist
           ? claim.startVal + normAngle(hand.roll - claim.startRoll) / TWIST_FULL
           : claim.startVal + (claim.startY - at.y) / 220;
-        engine.setParam(claim.param, val);
-        setParams({ ...engine.params });
+        applyKnob(claim.param, val);
       } else if (claim.type === 'bpmbar') {
         applyBpmAt(at.x);
       } else if (claim.type === 'shadebar') {
@@ -589,6 +645,54 @@ export default function Instrument() {
     }
   }, [frame, engine, chordOnSlot, chordOffAll]);
 
+  // Left hand: wrist angle sweeps the filter around the knob's base value.
+  // Straight up is neutral, and the deadzone keeps a steady hand from
+  // drifting. No React state here — the overlay reads `tiltState` so this
+  // stays free of per-frame renders.
+  useEffect(() => {
+    const i = frame.hands.findIndex(
+      (h) => h.handedness === 'Left' && h.landmarks.length === 21,
+    );
+    const hand = i >= 0 ? frame.hands[i] : null;
+    const release = () => {
+      if (tiltHeldRef.current) {
+        tiltHeldRef.current = false;
+        applyTilt(0);
+      }
+    };
+    if (!hand) {
+      release();
+      tiltArmedRef.current = true; // a hand raised into frame works at once
+      tiltState.armed = true;
+      return;
+    }
+    // While that hand drives a control (twisting a knob, dragging a bar) its
+    // roll belongs to the control. It is also left rotated when the pinch
+    // ends, so re-arm only once it comes back through neutral — otherwise
+    // releasing a knob would fling the filter to wherever the wrist stopped.
+    if (claimsRef.current.has(i)) {
+      release();
+      tiltArmedRef.current = false;
+      tiltState.armed = false;
+      return;
+    }
+    if (!tiltArmedRef.current) {
+      if (tiltAmount(hand.roll) !== 0) {
+        release();
+        return;
+      }
+      tiltArmedRef.current = true;
+      tiltState.armed = true;
+    }
+    // A pure function of the CURRENT angle — never an accumulator. Frames
+    // are deduped while a hand holds still, so anything that had to
+    // converge over successive frames would freeze part-way there.
+    // Smoothing already happens downstream: handsEqual ignores roll jitter
+    // under ~0.6 deg, and sweepCutoff ramps the filter over 50ms.
+    tiltHeldRef.current = true;
+    applyTilt(tiltAmount(hand.roll));
+  }, [frame, applyTilt]);
+
   // Hover highlights (camera only; mouse uses CSS :hover).
   const rectCacheRef = useRef<{ t: number; rects: Array<[string, DOMRect]> }>({ t: 0, rects: [] });
   const hotControls = useMemo(() => {
@@ -653,14 +757,13 @@ export default function Instrument() {
   // ---- Native (mouse/trackpad) interaction helpers ----
   const knobDrag = useRef<{ param: keyof SynthParams; startY: number; startVal: number } | null>(null);
   const onKnobPointerDown = (param: keyof SynthParams) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    knobDrag.current = { param, startY: e.clientY, startVal: engine.params[param] };
+    knobDrag.current = { param, startY: e.clientY, startVal: knobStart(param) };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onKnobPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = knobDrag.current;
     if (!d) return;
-    engine.setParam(d.param, d.startVal + (d.startY - e.clientY) / 220);
-    setParams({ ...engine.params });
+    applyKnob(d.param, d.startVal + (d.startY - e.clientY) / 220);
   };
   const onKnobPointerUp = () => {
     knobDrag.current = null;

@@ -10,6 +10,7 @@
 | --- | --- |
 | **Right hand** | finger piano along the top ruler: thumb+index = white keys · thumb+middle = black keys · thumb+ring = slide · left = low, right = high |
 | **Left hand** | thumb + **index / middle / ring / pinky** = chord slots 1–4, held while touched — a floating staff card follows your hand showing the notes |
+| **Left hand angle** | tilt your wrist to sweep the filter — straight up is neutral, clockwise opens, counter-clockwise closes |
 | **Mouse** | everything also works with a mouse — click buttons, hold chord cards, drag knobs vertically, drag the tempo bar |
 | **FREE mode** (default) | chromatic slide |
 | **AUTO mode** | slide locks to the scale that fits the sounding chord (maj7→ionian, min7→dorian, 7→mixolydian, dim→locrian) |

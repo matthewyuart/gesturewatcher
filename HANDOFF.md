@@ -18,6 +18,7 @@ browser; no backend, no samples.
 | right hand, thumb+ring | melody **slide** (glide 50ms), snapped per auto/free chip |
 | hand x-position | pitch along the top ruler, **left = low** (mapped to the ruler element's rect, cached 1s) |
 | left hand, thumb+index/middle/ring/pinky | chord slots 1–4, held while touched; newest touch wins |
+| **left hand wrist angle** | **sweeps the filter.** straight up (±11°) = neutral, the filter sits exactly where the knob was left; rotating clockwise opens it, counter-clockwise closes it, reaching the rails at ±75°. always live — it works while that hand is holding a chord |
 | pinch a knob + twist wrist | knob turn (135° roll = full range); mouse = vertical drag |
 | mouse | everything also works natively: click buttons, hold chord cards, drag bpm bar/knobs; in mouse mode the synthetic pinch pipeline skips UI (native handlers own it) |
 | `?mouse=1` | force mouse mode (used for all headless testing) |
@@ -26,6 +27,9 @@ browser; no backend, no samples.
 - the melody ruler is a **fixed 25-step chromatic ladder anchored at c** — chord changes dim/undim rungs, never move them.
 - auto mode snaps the slide finger to the chord-fitting scale (maj/maj7→ionian, min→aeolian, min7→dorian, dom7/sus4→mixolydian, dim→locrian); free = chromatic (default).
 - handedness labels from mediapipe are correct AS-IS for this user — a swap was tried and immediately reverted (`7512e21`). do not swap.
+- **filter = base + tilt.** `src/gesture/tilt.ts` owns the mapping (`tiltAmount(roll)` → -1..1 with a deadzone, `tiltCutoff(base, tilt)` → 0 keeps the base, ±1 reaches the rails so both directions keep full travel from any base). the filter KNOB sets the base; the hand modulates around it. because `engine.params.cutoff` therefore holds the LIVE (tilted) value, every knob interaction must go through `knobStart()` / `applyKnob()` in `Instrument.tsx` — reading `engine.params.cutoff` directly as a drag's start value would make the knob jump to the tilted value. the displayed knob always shows the base.
+- the tilt is a **pure function of the current angle, never an accumulator**. frames are deduped while a hand holds still (`handsEqual`), so anything that had to converge across successive frames (an EMA, an integrator) freezes part-way and leaves the filter at an arbitrary value. smoothing lives downstream instead: `handsEqual` ignores roll jitter under ~0.6°, and `sweepCutoff` ramps the filter over 50ms.
+- the tilt effect writes no React state (refs + `tiltState` + the engine only), so it costs no re-renders; `HandOverlay` reads `tiltState` to label its arc.
 
 ## music engine
 
@@ -119,7 +123,8 @@ video.
 ## testing (headless — how all of this was verified)
 
 - always test against `http://localhost:5173/?mouse=1` (browser pane has no camera).
-- debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()`, `__melody(finger, clientX)` → note name (makes the camera-only finger-piano routing testable: sweep x across the ruler rect and assert the pitch-class set).
+- debug hooks on `window`: `__synth()` (gates/freqs/rms/params), `__synthEngine`, `__drum()`, `__ui()` (now also `tilt` / `filterBase` / `filterLive`), `__melody(finger, clientX)` → note name (makes the camera-only finger-piano routing testable: sweep x across the ruler rect and assert the pitch-class set), `__tilt()` → `{base, cutoff, tilt, amount(roll), cutoffFor(base, tilt)}` for exercising the mapping directly.
+- **`window.__testHands`** (read every tick in `GestureProvider`) replaces the tracked hands with synthetic ones, which is the only way to exercise camera-only paths headlessly — chord fingers, the finger piano, wrist tilt. shape: `{handedness, cursor:{x,y}, pinch, pinchStrength, pose, roll, fingerTouch:[4], landmarks:[21 pts]}`; `landmarks.length === 21` is what marks a hand as camera-tracked. set it to `null` to hand control back. NOTE: the pane throttles hidden-tab timers hard — allow ≥1.5s per step, and re-read state in a later call rather than trusting a fast poll (a "stale" reading is usually throttling, not a bug). animate the injected roll if you need the overlay canvas to repaint for a screenshot.
 - the pane throttles the gesture loop to ~1fps when hidden and **collapses layout to zero size between tool calls**: drive drags as stepped synthetic `PointerEvent`s with 1.3s sleeps between down/move/up; **never trust rect measurements or screenshots for layout verification** — plant an in-page poller that captures rects when width > 0, screenshot (forces layout), then read the report. css transitions pause while the pane is hidden, so computed colors mid-transition read stale; set `transition: none` before reading.
 - glass visual checks: paint `.video-backdrop-fallback` with harsh color stripes via js, then screenshot.
 - audio checks: `noteOn` → `__synth().gates/freqs` + rms > 0; drums → poll max rms over ~2s (hits are transient).
@@ -148,6 +153,7 @@ prod smoke: power click → `__synth().running` → pinch → gate/freq → done
 - glass: the `blur(26px) saturate(2) brightness(1.18)` backdrop in `Instrument.css` + the `--glass` gradient in `index.css`.
 - finger-touch thresholds: `PINCH_ON 0.32 / PINCH_OFF 0.45` ratios in `src/gesture/classify.ts` (shared by pinch + all finger touches).
 - knob twist range: `TWIST_FULL` = 135°.
+- filter tilt: `TILT_DEAD` = 0.20 rad (~11°, the straight-up deadzone) and `TILT_FULL` = 1.30 rad (~75°, full sweep) in `src/gesture/tilt.ts`.
 - staff card offset from the left hand: `+26 / -170` px in the `staffPos` memo.
 
 ## known rough edges

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGestures } from '../gesture/GestureProvider';
+import { TILT_DEAD, TILT_FULL, tiltAmount, tiltState } from '../gesture/tilt';
 
 // Landmark connection pairs for drawing the hand skeleton.
 const CONNECTIONS: Array<[number, number]> = [
@@ -74,6 +75,38 @@ export function HandOverlay() {
       ctx.beginPath();
       ctx.arc(x, y, 2.5, 0, Math.PI * 2);
       ctx.fill();
+
+      // Left hand: filter tilt. A tick marks the neutral (straight up)
+      // position; past the deadzone an arc sweeps to the current angle and
+      // labels the cutoff it is producing.
+      if (hand.handedness === 'Left' && hand.landmarks.length === 21) {
+        // Disarmed (post knob-twist) draws no arc — the filter is not moving.
+        const t = tiltState.armed ? tiltAmount(hand.roll) : 0;
+        const R = radius + 12;
+        const TOP = -Math.PI / 2;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = t === 0 ? inkSoft : ink;
+        ctx.beginPath();
+        ctx.moveTo(x, y - R + 4);
+        ctx.lineTo(x, y - R - 4);
+        ctx.stroke();
+        if (t !== 0) {
+          const a = Math.max(-TILT_FULL, Math.min(TILT_FULL, hand.roll));
+          const dead = hand.roll > 0 ? TILT_DEAD : -TILT_DEAD;
+          ctx.beginPath();
+          ctx.arc(x, y, R, TOP + dead, TOP + a, a < 0);
+          ctx.stroke();
+          ctx.font = '11px Inter, system-ui, sans-serif';
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = a < 0 ? 'right' : 'left';
+          ctx.fillStyle = ink;
+          ctx.fillText(
+            `filter ${Math.round(tiltState.cutoff * 100)}`,
+            x + (a < 0 ? -R - 8 : R + 8),
+            y,
+          );
+        }
+      }
     }
   }, [frame]);
 
