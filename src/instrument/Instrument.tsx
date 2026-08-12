@@ -666,11 +666,15 @@ export default function Instrument() {
       tiltState.armed = true;
       return;
     }
-    // While that hand drives a control (twisting a knob, dragging a bar) its
-    // roll belongs to the control. It is also left rotated when the pinch
-    // ends, so re-arm only once it comes back through neutral — otherwise
-    // releasing a knob would fling the filter to wherever the wrist stopped.
-    if (claimsRef.current.has(i)) {
+    // A knob twist is the one interaction that CONSUMES this hand's roll:
+    // the wrist is deliberately rotated, and is left rotated when the pinch
+    // ends. So hold the filter at the base being dialled, and re-arm only
+    // once the wrist comes back through neutral — otherwise releasing a
+    // knob would fling the filter to wherever the wrist happened to stop.
+    // Every other claim (chord card, bpm/shade bar) leaves roll free, and
+    // those are this hand's natural targets, so tilt keeps running through
+    // them rather than snapping to base and back.
+    if (claimsRef.current.get(i)?.type === 'knob') {
       release();
       tiltArmedRef.current = false;
       tiltState.armed = false;
